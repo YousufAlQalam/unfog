@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b0f17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Unfog Damascus</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root { --bg:#0b0f17; --panel:#141a26; --gold:#e6c36a; --text:#e9edf5; --muted:#8a94a8; --ok:#5fd38d; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+  #map { position:absolute; inset:0; background:#05070c; }
+  .leaflet-control-attribution { background:rgba(0,0,0,.5)!important; color:#aaa!important; font-size:10px; }
+  .leaflet-control-attribution a { color:#ccc!important; }
+
+  #hud { position:absolute; top:calc(env(safe-area-inset-top) + 10px); left:10px; right:10px; z-index:1000; display:flex; gap:8px; align-items:center; pointer-events:none; }
+  .card { background:rgba(20,26,38,.92); border:1px solid rgba(230,195,106,.25); border-radius:14px; padding:8px 12px; pointer-events:auto; backdrop-filter:blur(6px); }
+  #lvl { flex:1; }
+  #lvl .title { font-weight:700; color:var(--gold); font-size:14px; }
+  #lvl .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+  #bar { height:5px; background:#222a3a; border-radius:3px; margin-top:5px; overflow:hidden; }
+  #bar > div { height:100%; background:linear-gradient(90deg,#b98c2e,var(--gold)); width:0%; transition:width .4s; }
+  #gps { font-size:11px; text-align:center; min-width:62px; }
+  #gps .dot { width:9px; height:9px; border-radius:50%; background:#666; display:inline-block; margin-right:4px; vertical-align:middle; }
+
+  #bottom { position:absolute; bottom:calc(env(safe-area-inset-bottom) + 14px); left:10px; right:10px; z-index:1000; display:flex; gap:8px; justify-content:center; }
+  button { font:inherit; border:none; cursor:pointer; }
+  .btn { background:var(--panel); color:var(--text); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:12px 14px; font-size:14px; font-weight:600; }
+  .btn.primary { background:var(--gold); color:#1b1405; border-color:var(--gold); }
+  .btn.walking { background:var(--ok); color:#06210f; border-color:var(--ok); }
+  .btn:disabled { opacity:.45; }
+
+  #toast { position:absolute; left:50%; top:90px; transform:translateX(-50%) translateY(-20px); z-index:2000; background:var(--gold); color:#1b1405; font-weight:700; padding:10px 16px; border-radius:12px; opacity:0; transition:all .35s; pointer-events:none; text-align:center; max-width:86%; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .sheet { position:absolute; left:0; right:0; bottom:0; z-index:3000; background:var(--panel); border-radius:20px 20px 0 0; padding:18px 16px calc(env(safe-area-inset-bottom) + 18px); max-height:78vh; overflow:auto; transform:translateY(105%); transition:transform .3s; box-shadow:0 -10px 40px rgba(0,0,0,.6); }
+  .sheet.open { transform:translateY(0); }
+  .sheet h2 { margin:0 0 4px; font-size:18px; color:var(--gold); }
+  .sheet .ar { font-size:15px; color:var(--muted); margin-bottom:10px; direction:rtl; }
+  .sheet p { font-size:14px; line-height:1.5; color:#cdd3df; }
+  .sheet .row { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .sheet .row .btn { flex:1; }
+  .sheet img.ph { width:100%; border-radius:12px; margin-top:8px; }
+  #scrim { position:absolute; inset:0; z-index:2500; background:rgba(0,0,0,.45); display:none; }
+  #scrim.open { display:block; }
+  .list-item { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid rgba(255,255,255,.06); }
+  .list-item .ic { font-size:20px; width:28px; text-align:center; }
+  .list-item .nm { flex:1; font-size:14px; }
+  .list-item .nm small { display:block; color:var(--muted); font-size:11px; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; }
+  .grid img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; }
+  input[type=text] { width:100%; background:#0d121c; border:1px solid #2a3346; color:var(--text); border-radius:10px; padding:12px; font-size:15px; margin-top:6px; }
+  .stat { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-bottom:1px solid rgba(255,255,255,.05); }
+  .stat b { color:var(--gold); }
+
+  .pin { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; border:2px solid var(--gold); background:#1a2030; box-shadow:0 0 12px rgba(230,195,106,.5); }
+  .pin.hidden { border-color:#555; color:#999; box-shadow:none; font-weight:800; font-size:16px; background:#11151f; }
+  .pin.done { border-color:var(--ok); box-shadow:0 0 12px rgba(95,211,141,.6); }
+  .pin.near { animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(230,195,106,.8)} 100%{box-shadow:0 0 0 16px rgba(230,195,106,0)} }
+  .me { width:18px; height:18px; border-radius:50%; background:#4ea3ff; border:3px solid #fff; box-shadow:0 0 0 6px rgba(78,163,255,.25); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="hud">
+  <div class="card" id="lvl">
+    <div class="title" id="lvlTitle">Lv 1 · Stranger</div>
+    <div class="sub" id="lvlSub">0 XP</div>
+    <div id="bar"><div></div></div>
+  </div>
+  <div class="card" id="gps"><span class="dot" id="gpsDot"></span><span id="gpsTxt">GPS off</span></div>
+</div>
+
+<div id="bottom">
+  <button class="btn" id="btnQuests">🗺️ Quests</button>
+  <button class="btn primary" id="btnWalk">▶ Start walk</button>
+  <button class="btn" id="btnMenu">☰</button>
+</div>
+
+<div id="toast"></div>
+<div id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+
+<input type="file" id="fileEnv" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileUser" accept="image/*" capture="user" hidden>
+<input type="file" id="fileImport" accept="application/json,.json" hidden>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- Settings ----------
+const CELL = 0.00015;          // grid cell size in degrees (~15m)
+const REVEAL_M = 45;           // fog cleared around you, in metres
+const UNLOCK_M = 120;          // how close you must be to unlock a quest
+const HINT_M = 250;            // quest names appear once you've explored this close
+const MAX_ACC = 60;            // ignore GPS fixes worse than this (metres)
+const XP_CELL = 1, XP_QUEST = 60;
+const START = [33.5110, 36.3050];
+
+// ---------- Built-in quests (coordinates approximate; unlock radius is generous) ----------
+const BASE_QUESTS = [
+  { id:'umayyad',  ic:'🕌', name:'Umayyad Mosque', ar:'الجامع الأموي', lat:33.5115, lng:36.3066, kind:'photo', task:'Photograph the courtyard mosaics or the Minaret of Jesus.' },
+  { id:'azem',     ic:'🏛️', name:'Azem Palace', ar:'قصر العظم', lat:33.5095, lng:36.3069, kind:'photo', task:'Find the courtyard fountain and capture it.' },
+  { id:'hamidiyya',ic:'🛍️', name:'Souq al-Hamidiyya', ar:'سوق الحميدية', lat:33.5112, lng:36.3035, kind:'photo', task:'Capture the light coming through the bullet holes in the roof.' },
+  { id:'bakdash',  ic:'🍨', name:'Bakdash', ar:'بكداش', lat:33.5112, lng:36.3043, kind:'selfie', task:'Selfie with a bouza. Non-negotiable.' },
+  { id:'citadel',  ic:'🏰', name:'Citadel of Damascus', ar:'قلعة دمشق', lat:33.5117, lng:36.3015, kind:'photo', task:'Photograph the walls from the Saladin statue side.' },
+  { id:'khan',     ic:'🐪', name:'Khan As\'ad Pasha', ar:'خان أسعد باشا', lat:33.5098, lng:36.3074, kind:'photo', task:'Look straight up at the domes and shoot.' },
+  { id:'bimaristan',ic:'⚕️', name:'Bimaristan Nur al-Din', ar:'البيمارستان النوري', lat:33.5101, lng:36.3034, kind:'photo', task:'A 12th-century hospital. Find its doorway.' },
+  { id:'qaymariyya',ic:'☕', name:'Al-Qaymariyya', ar:'القيمرية', lat:33.5120, lng:36.3100, kind:'selfie', task:'Get lost in the alleys, then a selfie at the first café you find.' },
+  { id:'babtouma', ic:'🚪', name:'Bab Touma', ar:'باب توما', lat:33.5139, lng:36.3164, kind:'photo', task:'Photograph the gate itself.' },
+  { id:'hananiya', ic:'⛪', name:'Chapel of Ananias', ar:'كنيسة حنانيا', lat:33.5116, lng:36.3182, kind:'photo', task:'Find the underground chapel.' },
+  { id:'babsharqi',ic:'🌅', name:'Bab Sharqi & Straight Street', ar:'باب شرقي والشارع المستقيم', lat:33.5097, lng:36.3195, kind:'photo', task:'Walk Straight Street end to end. Photo at the eastern gate.' },
+  { id:'takiyya',  ic:'🕌', name:'Takiyya Sulaymaniyya', ar:'التكية السليمانية', lat:33.5138, lng:36.2910, kind:'photo', task:'Capture the twin minarets.' },
+  { id:'museum',   ic:'🏺', name:'National Museum', ar:'المتحف الوطني', lat:33.5126, lng:36.2888, kind:'photo', task:'The gate of Qasr al-Hayr is the entrance itself.' },
+  { id:'hejaz',    ic:'🚂', name:'Hejaz Railway Station', ar:'محطة الحجاز', lat:33.5108, lng:36.2918, kind:'photo', task:'Photograph the painted ceiling.' },
+  { id:'marjeh',   ic:'🗿', name:'Marjeh Square', ar:'ساحة المرجة', lat:33.5106, lng:36.2995, kind:'photo', task:'Find the old column monument.' },
+  { id:'sarouja',  ic:'🏚️', name:'Sarouja', ar:'ساروجة', lat:33.5178, lng:36.3020, kind:'photo', task:'"Little Istanbul." Find an Ottoman house door.' },
+  { id:'ibnarabi', ic:'📿', name:'Muhyiddin Ibn Arabi Mosque', ar:'جامع الشيخ محيي الدين', lat:33.5297, lng:36.2905, kind:'photo', task:'Walk up through the Salihiyya souq to get here.' },
+  { id:'qasioun',  ic:'⛰️', name:'Qasioun lookout', ar:'جبل قاسيون', lat:33.5370, lng:36.2870, kind:'selfie', task:'Selfie with the whole city lit up behind you. Go at night.' },
+  { id:'midan',    ic:'🥙', name:'Al-Midan', ar:'الميدان', lat:33.4990, lng:36.3010, kind:'selfie', task:'Eat something you\'ve never ordered before. Selfie with it.' },
+  { id:'tishreen', ic:'🌳', name:'Tishreen Park', ar:'حديقة تشرين', lat:33.5195, lng:36.2735, kind:'photo', task:'Find the quietest corner of the park.' }
+];
+
+const TITLES = ['Stranger','Passer-by','Wanderer','Explorer','Pathfinder','Alley Runner','Old City Ranger','Cartographer','Ibn Battuta Jr.','Shaykh al-Hara'];
+
+// ---------- Storage ----------
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ toast('⚠️ Storage full or blocked'); } }
+};
+let cells = new Set(LS.get('ud_cells', []));
+let done = LS.get('ud_done', {});           // id -> timestamp
+let custom = LS.get('ud_custom', []);       // user-added quests
+let bonusXp = LS.get('ud_bonus', 0);
+let lastPos = null;
+const saveCells = debounce(() => LS.set('ud_cells', [...cells]), 1500);
+
+let db = null;
+function openDB(){
+  return new Promise(res => {
+    try {
+      const r = indexedDB.open('unfog', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('photos');
+      r.onsuccess = () => { db = r.result; res(db); };
+      r.onerror = () => res(null);
+    } catch(e){ res(null); }
+  });
+}
+function putPhoto(id, data){ return new Promise(res => { if(!db) return res(false); const t = db.transaction('photos','readwrite'); t.objectStore('photos').put(data, id); t.oncomplete = () => res(true); t.onerror = () => res(false); }); }
+function getPhoto(id){ return new Promise(res => { if(!db) return res(null); const q = db.transaction('photos').objectStore('photos').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); }
+function allPhotos(){ return new Promise(res => { if(!db) return res({}); const out = {}; const q = db.transaction('photos').objectStore('photos').openCursor(); q.onsuccess = e => { const c = e.target.result; if(c){ out[c.key] = c.value; c.continue(); } else res(out); }; q.onerror = () => res(out); }); }
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+
+// ---------- Helpers ----------
+function debounce(f, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; }
+function key(lat, lng){ return Math.round(lat / CELL) + ',' + Math.round(lng / CELL); }
+function cellCenter(k){ const [a, b] = k.split(',').map(Number); return [a * CELL, b * CELL]; }
+function dist(a1, o1, a2, o2){
+  const R = 6371000, r = Math.PI / 180;
+  const dA = (a2 - a1) * r, dO = (o2 - o1) * r;
+  const h = Math.sin(dA/2)**2 + Math.cos(a1*r) * Math.cos(a2*r) * Math.sin(dO/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function allQuests(){ return BASE_QUESTS.concat(custom); }
+function totalXp(){ return cells.size * XP_CELL + Object.keys(done).length * XP_QUEST + bonusXp; }
+function levelInfo(xp){
+  let lv = 1; const need = l => Math.round(150 * Math.pow(l, 1.6));
+  let base = 0;
+  while (xp >= base + need(lv)) { base += need(lv); lv++; }
+  return { lv, into: xp - base, need: need(lv), title: TITLES[Math.min(lv - 1, TITLES.length - 1)] };
+}
+let toastT;
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function vibrate(p){ try { navigator.vibrate && navigator.vibrate(p); } catch(e){} }
+
+// ---------- Map ----------
+const map = L.map('map', { zoomControl:false, zoomAnimation:false, attributionControl:true }).setView(LS.get('ud_view', START), LS.get('ud_zoom', 15));
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, subdomains:'abc', attribution:'© OpenStreetMap' }).addTo(map);
+map.on('moveend', () => { LS.set('ud_view', [map.getCenter().lat, map.getCenter().lng]); LS.set('ud_zoom', map.getZoom()); });
+
+// Fog layer: a canvas in its own pane between tiles and markers
+map.createPane('fog'); map.getPane('fog').style.zIndex = 450; map.getPane('fog').style.pointerEvents = 'none';
+const fog = document.createElement('canvas'); fog.style.position = 'absolute';
+map.getPane('fog').appendChild(fog);
+const brush = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64,64,0,64,64,64);
+  gr.addColorStop(0,'rgba(0,0,0,1)'); gr.addColorStop(.55,'rgba(0,0,0,1)'); gr.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0,0,128,128); return c;
+})();
+function drawFog(){
+  const size = map.getSize(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  fog.width = size.x * dpr; fog.height = size.y * dpr;
+  fog.style.width = size.x + 'px'; fog.style.height = size.y + 'px';
+  L.DomUtil.setPosition(fog, map.containerPointToLayerPoint([0,0]));
+  const g = fog.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = 'rgba(6,9,16,0.9)'; g.fillRect(0,0,size.x,size.y);
+  // subtle texture
+  g.fillStyle = 'rgba(230,195,106,0.03)';
+  for (let i = 0; i < 40; i++) g.fillRect((i * 97) % size.x, (i * 53) % size.y, 2, 2);
+  const lat = map.getCenter().lat, z = map.getZoom();
+  const mpp = 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z + 8);
+  const r = Math.max(REVEAL_M / mpp, 3);
+  const b = map.getBounds().pad(0.1);
+  g.globalCompositeOperation = 'destination-out';
+  for (const k of cells) {
+    const [a, o] = cellCenter(k);
+    if (a < b.getSouth() || a > b.getNorth() || o < b.getWest() || o > b.getEast()) continue;
+    const p = map.latLngToContainerPoint([a, o]);
+    g.drawImage(brush, p.x - r, p.y - r, r * 2, r * 2);
+  }
+}
+map.on('move zoom resize viewreset', drawFog);
+
+// ---------- Quest markers ----------
+const markers = {};
+function isHinted(q){
+  if (done[q.id] || q.custom) return true;
+  const rad = Math.ceil(HINT_M / 15);
+  const ck = Math.round(q.lat / CELL), cg = Math.round(q.lng / CELL);
+  for (let i = -rad; i <= rad; i += 2) for (let j = -rad; j <= rad; j += 2) if (cells.has((ck + i) + ',' + (cg + j))) return true;
+  return false;
+}
+function renderMarkers(){
+  const here = lastPos;
+  for (const q of allQuests()) {
+    const hinted = isHinted(q), isDone = !!done[q.id];
+    const near = here && !isDone && dist(here[0], here[1], q.lat, q.lng) <= UNLOCK_M;
+    const cls = 'pin' + (isDone ? ' done' : '') + (hinted ? '' : ' hidden') + (near ? ' near' : '');
+    const html = `<div class="${cls}">${hinted ? q.ic : '?'}</div>`;
+    const icon = L.divIcon({ html, className:'', iconSize:[34,34], iconAnchor:[17,17] });
+    if (markers[q.id]) markers[q.id].setIcon(icon);
+    else markers[q.id] = L.marker([q.lat, q.lng], { icon }).addTo(map).on('click', () => openQuest(q.id));
+  }
+  for (const id in markers) if (!allQuests().find(q => q.id === id)) { map.removeLayer(markers[id]); delete markers[id]; }
+}
+
+// ---------- HUD ----------
+function renderHud(){
+  const xp = totalXp(), L1 = levelInfo(xp);
+  document.getElementById('lvlTitle').textContent = `Lv ${L1.lv} · ${L1.title}`;
+  const km2 = (cells.size * 15 * 15 / 1e6).toFixed(2);
+  document.getElementById('lvlSub').textContent = `${xp} XP · ${Object.keys(done).length}/${allQuests().length} quests · ${km2} km² unfogged`;
+  document.querySelector('#bar > div').style.width = Math.round(L1.into / L1.need * 100) + '%';
+}
+let prevLevel = levelInfo(totalXp()).lv;
+function checkLevelUp(){
+  const lv = levelInfo(totalXp()).lv;
+  if (lv > prevLevel) { prevLevel = lv; vibrate([80,60,80]); toast(`⬆️ Level ${lv}: ${TITLES[Math.min(lv-1, TITLES.length-1)]}!`); }
+}
+
+// ---------- GPS / walking ----------
+let watchId = null, meMarker = null, accCircle = null, wakeLock = null, follow = true, lastFix = null;
+const btnWalk = document.getElementById('btnWalk');
+function setGps(state, txt){ document.getElementById('gpsDot').style.background = state === 'ok' ? '#5fd38d' : state === 'wait' ? '#e6c36a' : state === 'err' ? '#ff6b6b' : '#666'; document.getElementById('gpsTxt').textContent = txt; }
+function reveal(lat, lng){
+  let added = 0;
+  const steps = Math.ceil(REVEAL_M / 15);
+  for (let i = -steps; i <= steps; i++) for (let j = -steps; j <= steps; j++) {
+    const a = lat + i * CELL, o = lng + j * CELL;
+    if (dist(lat, lng, a, o) > REVEAL_M * 0.6) continue;
+    const k = key(a, o); if (!cells.has(k)) { cells.add(k); added++; }
+  }
+  return added;
+}
+function onFix(pos){
+  const { latitude:lat, longitude:lng, accuracy:acc } = pos.coords;
+  if (acc > MAX_ACC) { setGps('wait', `±${Math.round(acc)}m…`); return; }
+  setGps('ok', `±${Math.round(acc)}m`);
+  let added = 0;
+  if (lastFix) {
+    const d = dist(lastFix[0], lastFix[1], lat, lng);
+    if (d < 400) { // fill the path between fixes
+      const n = Math.ceil(d / 10);
+      for (let s = 1; s <= n; s++) added += reveal(lastFix[0] + (lat - lastFix[0]) * s / n, lastFix[1] + (lng - lastFix[1]) * s / n);
+    } else added += reveal(lat, lng);
+  } else added += reveal(lat, lng);
+  lastFix = [lat, lng]; lastPos = [lat, lng];
+  if (!meMarker) {
+    meMarker = L.marker([lat, lng], { icon: L.divIcon({ html:'<div class="me"></div>', className:'', iconSize:[18,18], iconAnchor:[9,9] }), zIndexOffset:1000 }).addTo(map);
+    accCircle = L.circle([lat, lng], { radius:acc, color:'#4ea3ff', weight:1, fillOpacity:.06 }).addTo(map);
+  } else { meMarker.setLatLng([lat, lng]); accCircle.setLatLng([lat, lng]).setRadius(acc); }
+  if (follow) map.panTo([lat, lng], { animate:false });
+  if (added) { saveCells(); drawFog(); renderHud(); checkLevelUp(); }
+  renderMarkers();
+  // nearby quest nudge
+  for (const q of allQuests()) {
+    if (done[q.id] || q._nudged) continue;
+    if (dist(lat, lng, q.lat, q.lng) <= UNLOCK_M) { q._nudged = true; vibrate(200); toast(`${q.ic} ${q.name} is right here. Tap it to unlock!`); }
+  }
+}
+function onErr(e){
+  if (e.code === 1) { setGps('err', 'Denied'); toast('Location permission denied. Enable it in browser settings.'); stopWalk(); }
+  else setGps('wait', 'Searching…');
+}
+async function startWalk(){
+  if (!('geolocation' in navigator)) { toast('This browser has no GPS access'); return; }
+  if (!window.isSecureContext) { toast('GPS needs an https:// address. See the setup notes.'); return; }
+  setGps('wait', 'Searching…'); follow = true; lastFix = null;
+  watchId = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy:true, maximumAge:2000, timeout:20000 });
+  btnWalk.textContent = '■ Stop walk'; btnWalk.classList.remove('primary'); btnWalk.classList.add('walking');
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+  toast('Walk started. Keep the app open while you explore.');
+}
+function stopWalk(){
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null;
+  btnWalk.textContent = '▶ Start walk'; btnWalk.classList.add('primary'); btnWalk.classList.remove('walking');
+  try { wakeLock && wakeLock.release(); } catch(e){} wakeLock = null;
+  if (document.getElementById('gpsTxt').textContent !== 'Denied') setGps('off', 'GPS off');
+  LS.set('ud_cells', [...cells]);
+}
+btnWalk.onclick = () => watchId === null ? startWalk() : stopWalk();
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && watchId !== null && !wakeLock) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+  if (document.visibilityState === 'hidden') LS.set('ud_cells', [...cells]);
+});
+map.on('dragstart', () => { follow = false; });
+
+// ---------- Sheets ----------
+const sheet = document.getElementById('sheet'), scrim = document.getElementById('scrim');
+function openSheet(html){ sheet.innerHTML = html; sheet.classList.add('open'); scrim.classList.add('open'); sheet.scrollTop = 0; }
+function closeSheet(){ sheet.classList.remove('open'); scrim.classList.remove('open'); }
+scrim.onclick = closeSheet;
+
+async function openQuest(id){
+  const q = allQuests().find(x => x.id === id); if (!q) return;
+  const hinted = isHinted(q);
+  if (!hinted) {
+    openSheet(`<h2>? Undiscovered</h2><p>Something is hidden in the fog here. Walk closer to reveal what it is.</p><div class="row"><button class="btn" data-a="close">OK</button></div>`);
+    return;
+  }
+  const d = lastPos ? dist(lastPos[0], lastPos[1], q.lat, q.lng) : null;
+  const canUnlock = d !== null && d <= UNLOCK_M;
+  const photo = done[q.id] ? await getPhoto(q.id) : null;
+  const when = done[q.id] ? new Date(done[q.id]).toLocaleDateString() : '';
+  openSheet(`
+    <h2>${q.ic} ${esc(q.name)}</h2>
+    ${q.ar ? `<div class="ar">${esc(q.ar)}</div>` : ''}
+    <p>${esc(q.task || '')}</p>
+    <p style="color:var(--muted);font-size:12px">${q.kind === 'selfie' ? '🤳 Selfie quest' : '📷 Photo quest'} · +${XP_QUEST} XP ${d !== null ? '· ' + (d < 1000 ? Math.round(d) + ' m away' : (d/1000).toFixed(1) + ' km away') : '· start a walk to measure distance'}</p>
+    ${done[q.id] ? `<p style="color:var(--ok)">✅ Unlocked on ${when}</p>` : ''}
+    ${photo ? `<img class="ph" src="${photo}">` : ''}
+    <div class="row">
+      ${done[q.id]
+        ? `<button class="btn" data-a="retake" data-id="${q.id}">Replace photo</button>`
+        : `<button class="btn primary" data-a="unlock" data-id="${q.id}" ${canUnlock ? '' : 'disabled'}>${canUnlock ? (q.kind === 'selfie' ? '🤳 Take selfie' : '📷 Take photo') : '🔒 Get within ' + UNLOCK_M + ' m'}</button>`}
+      <button class="btn" data-a="close">Close</button>
+    </div>
+    ${q.custom ? `<div class="row"><button class="btn" data-a="delcustom" data-id="${q.id}" style="color:#ff8a8a">Delete this spot</button></div>` : ''}
+  `);
+}
+
+let pendingQuest = null;
+function takePhoto(q){
+  pendingQuest = q;
+  document.getElementById(q.kind === 'selfie' ? 'fileUser' : 'fileEnv').click();
+}
+async function compress(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const max = 1280, s = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.8);
+  } finally { URL.revokeObjectURL(url); }
+}
+async function onPhoto(e){
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f || !pendingQuest) return;
+  const q = pendingQuest; pendingQuest = null;
+  try {
+    const data = await compress(f);
+    await putPhoto(q.id, data);
+    const first = !done[q.id];
+    done[q.id] = done[q.id] || Date.now(); LS.set('ud_done', done);
+    renderMarkers(); renderHud();
+    if (first) { vibrate([100,50,100,50,200]); toast(`🏆 ${q.name} unlocked! +${XP_QUEST} XP`); checkLevelUp(); }
+    openQuest(q.id);
+  } catch(err){ toast('Could not read that photo'); }
+}
+document.getElementById('fileEnv').onchange = onPhoto;
+document.getElementById('fileUser').onchange = onPhoto;
+
+function openQuests(){
+  const here = lastPos;
+  const qs = allQuests().map(q => ({ q, d: here ? dist(here[0], here[1], q.lat, q.lng) : null }))
+    .sort((a, b) => (!!done[a.q.id] - !!done[b.q.id]) || ((a.d ?? 1e9) - (b.d ?? 1e9)));
+  openSheet(`<h2>Quests</h2><p style="color:var(--muted);font-size:13px;margin-top:0">Hidden ones show as ? until you explore near them.</p>` +
+    qs.map(({ q, d }) => {
+      const h = isHinted(q);
+      return `<div class="list-item" data-a="goto" data-id="${q.id}">
+        <div class="ic">${done[q.id] ? '✅' : h ? q.ic : '❔'}</div>
+        <div class="nm">${h ? esc(q.name) : 'Undiscovered'}<small>${h && q.ar ? esc(q.ar) + ' · ' : ''}${d !== null ? (d < 1000 ? Math.round(d) + ' m' : (d/1000).toFixed(1) + ' km') : ''}</small></div>
+      </div>`;
+    }).join('') + `<div class="row"><button class="btn" data-a="close">Close</button></div>`);
+}
+
+async function openMenu(){
+  const photos = await allPhotos();
+  const ids = Object.keys(photos);
+  const L1 = levelInfo(totalXp());
+  openSheet(`
+    <h2>Your Damascus</h2>
+    <div class="stat"><span>Level</span><b>${L1.lv} · ${L1.title}</b></div>
+    <div class="stat"><span>Total XP</span><b>${totalXp()}</b></div>
+    <div class="stat"><span>Area unfogged</span><b>${(cells.size * 225 / 1e6).toFixed(2)} km²</b></div>
+    <div class="stat"><span>Quests done</span><b>${Object.keys(done).length} / ${allQuests().length}</b></div>
+    <div class="stat"><span>Your own spots</span><b>${custom.length}</b></div>
+    <div class="row">
+      <button class="btn primary" data-a="addspot">➕ Add a spot here</button>
+      <button class="btn" data-a="locate">📍 Center on me</button>
+    </div>
+    <h2 style="margin-top:18px;font-size:16px">Album</h2>
+    ${ids.length ? `<div class="grid">${ids.map(i => `<img src="${photos[i]}" data-a="goto" data-id="${esc(i)}">`).join('')}</div>` : `<p style="color:var(--muted)">No photos yet. Unlock a quest to start your album.</p>`}
+    <h2 style="margin-top:18px;font-size:16px">Backup</h2>
+    <p style="color:var(--muted);font-size:13px">Everything lives only on this phone. Export a backup now and then so you never lose your map.</p>
+    <div class="row">
+      <button class="btn" data-a="export">⬇️ Export</button>
+      <button class="btn" data-a="import">⬆️ Import</button>
+    </div>
+    <div class="row"><button class="btn" data-a="close">Close</button></div>
+  `);
+}
+
+function addSpot(){
+  if (!lastPos) { toast('Start a walk first so I know where you are'); return; }
+  openSheet(`
+    <h2>➕ New spot</h2>
+    <p>Save this exact place as your own quest: a café, a door, a view, anything worth remembering.</p>
+    <input type="text" id="spotName" placeholder="Name of the place" maxlength="60">
+    <input type="text" id="spotTask" placeholder="What's the challenge? (optional)" maxlength="120">
+    <div class="row">
+      <button class="btn" data-a="spotsave" data-kind="photo">📷 Save as photo quest</button>
+      <button class="btn" data-a="spotsave" data-kind="selfie">🤳 Selfie quest</button>
+    </div>
+    <div class="row"><button class="btn" data-a="close">Cancel</button></div>`);
+  setTimeout(() => { const i = document.getElementById('spotName'); i && i.focus(); }, 300);
+}
+
+async function exportData(){
+  const payload = { app:'unfog-damascus', v:1, at:new Date().toISOString(), cells:[...cells], done, custom, bonusXp, photos: await allPhotos() };
+  const blob = new Blob([JSON.stringify(payload)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'unfog-damascus-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('Backup saved to Downloads');
+}
+async function importData(file){
+  try {
+    const p = JSON.parse(await file.text());
+    if (p.app !== 'unfog-damascus') throw 0;
+    (p.cells || []).forEach(c => cells.add(c));
+    Object.assign(done, p.done || {});
+    for (const c of (p.custom || [])) if (!custom.find(x => x.id === c.id)) custom.push(c);
+    for (const id in (p.photos || {})) await putPhoto(id, p.photos[id]);
+    LS.set('ud_cells', [...cells]); LS.set('ud_done', done); LS.set('ud_custom', custom);
+    drawFog(); renderMarkers(); renderHud(); closeSheet(); toast('Backup restored');
+  } catch(e){ toast('That file is not a valid backup'); }
+}
+document.getElementById('fileImport').onchange = e => { const f = e.target.files[0]; e.target.value = ''; f && importData(f); };
+
+sheet.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]'); if (!el) return;
+  const a = el.dataset.a, id = el.dataset.id;
+  const q = id && allQuests().find(x => x.id === id);
+  if (a === 'close') closeSheet();
+  else if (a === 'unlock' || a === 'retake') q && takePhoto(q);
+  else if (a === 'goto') { if (q) { closeSheet(); follow = false; map.setView([q.lat, q.lng], 17); setTimeout(() => openQuest(id), 250); } }
+  else if (a === 'addspot') addSpot();
+  else if (a === 'locate') { closeSheet(); follow = true; if (lastPos) map.setView(lastPos, 17); else toast('Start a walk first'); }
+  else if (a === 'export') exportData();
+  else if (a === 'import') document.getElementById('fileImport').click();
+  else if (a === 'delcustom') {
+    if (el.dataset.confirm) { custom = custom.filter(x => x.id !== id); delete done[id]; LS.set('ud_custom', custom); LS.set('ud_done', done); renderMarkers(); renderHud(); closeSheet(); toast('Spot deleted'); }
+    else { el.dataset.confirm = '1'; el.textContent = 'Tap again to confirm'; }
+  }
+  else if (a === 'spotsave') {
+    const name = (document.getElementById('spotName').value || '').trim();
+    if (!name) { toast('Give the spot a name'); return; }
+    const task = (document.getElementById('spotTask').value || '').trim();
+    const s = { id:'c' + Date.now(), ic: el.dataset.kind === 'selfie' ? '⭐' : '📌', name, ar:'', task: task || 'Your own spot.', lat:lastPos[0], lng:lastPos[1], kind:el.dataset.kind, custom:true };
+    custom.push(s); LS.set('ud_custom', custom);
+    renderMarkers(); renderHud(); closeSheet(); toast('📌 Spot saved'); setTimeout(() => openQuest(s.id), 300);
+  }
+});
+
+document.getElementById('btnQuests').onclick = openQuests;
+document.getElementById('btnMenu').onclick = openMenu;
+
+// ---------- Boot ----------
+openDB().then(() => { drawFog(); renderMarkers(); renderHud(); });
+drawFog();
+if (!window.isSecureContext) setTimeout(() => toast('Open this from an https:// link to use GPS'), 800);
+})();
+</script>
+</body>
+</html>
