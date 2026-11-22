@@ -2,90 +2,215 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0b0f17">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e1424">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Unfog Damascus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  :root { --bg:#0b0f17; --panel:#141a26; --gold:#e6c36a; --text:#e9edf5; --muted:#8a94a8; --ok:#5fd38d; }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
-  #map { position:absolute; inset:0; background:#05070c; }
-  .leaflet-control-attribution { background:rgba(0,0,0,.5)!important; color:#aaa!important; font-size:10px; }
-  .leaflet-control-attribution a { color:#ccc!important; }
+  :root{
+    --bg:#0e1424; --panel:#161e33; --panel2:#1d2742; --line:rgba(255,255,255,.08);
+    --gold:#f2c66d; --gold2:#ffdf9a; --text:#eef1f8; --muted:#97a2bd; --ok:#5fd38d; --bad:#ff8a8a;
+    --navh:64px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Cairo,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  button{font:inherit;border:none;cursor:pointer;color:inherit;background:none}
+  #map{position:absolute;inset:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom));background:#1a2236}
+  .leaflet-control-attribution{background:rgba(14,20,36,.6)!important;color:#9aa!important;font-size:9px}
+  .leaflet-control-attribution a{color:#cdd!important}
 
-  #hud { position:absolute; top:calc(env(safe-area-inset-top) + 10px); left:10px; right:10px; z-index:1000; display:flex; gap:8px; align-items:center; pointer-events:none; }
-  .card { background:rgba(20,26,38,.92); border:1px solid rgba(230,195,106,.25); border-radius:14px; padding:8px 12px; pointer-events:auto; backdrop-filter:blur(6px); }
-  #lvl { flex:1; }
-  #lvl .title { font-weight:700; color:var(--gold); font-size:14px; }
-  #lvl .sub { font-size:11px; color:var(--muted); margin-top:2px; }
-  #bar { height:5px; background:#222a3a; border-radius:3px; margin-top:5px; overflow:hidden; }
-  #bar > div { height:100%; background:linear-gradient(90deg,#b98c2e,var(--gold)); width:0%; transition:width .4s; }
-  #gps { font-size:11px; text-align:center; min-width:62px; }
-  #gps .dot { width:9px; height:9px; border-radius:50%; background:#666; display:inline-block; margin-right:4px; vertical-align:middle; }
+  /* top HUD */
+  #hud{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;z-index:1000;display:flex;gap:8px;pointer-events:none}
+  .glass{background:rgba(22,30,51,.88);border:1px solid rgba(242,198,109,.22);border-radius:16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:auto}
+  #lvl{flex:1;padding:7px 12px}
+  #lvlTitle{font-weight:800;color:var(--gold);font-size:14px;line-height:1.2}
+  #lvlSub{font-size:11px;color:var(--muted)}
+  #bar{height:5px;background:#26304b;border-radius:3px;margin-top:4px;overflow:hidden}
+  #bar>div{height:100%;width:0;background:linear-gradient(90deg,#c4902f,var(--gold2));transition:width .5s}
+  #gps{padding:7px 10px;font-size:11px;display:flex;align-items:center;gap:5px;white-space:nowrap}
+  #gps i{width:9px;height:9px;border-radius:50%;background:#667;display:inline-block}
 
-  #bottom { position:absolute; bottom:calc(env(safe-area-inset-bottom) + 14px); left:10px; right:10px; z-index:1000; display:flex; gap:8px; justify-content:center; }
-  button { font:inherit; border:none; cursor:pointer; }
-  .btn { background:var(--panel); color:var(--text); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:12px 14px; font-size:14px; font-weight:600; }
-  .btn.primary { background:var(--gold); color:#1b1405; border-color:var(--gold); }
-  .btn.walking { background:var(--ok); color:#06210f; border-color:var(--ok); }
-  .btn:disabled { opacity:.45; }
+  /* right tools */
+  #tools{position:absolute;right:10px;top:calc(env(safe-area-inset-top) + 72px);z-index:1000;display:flex;flex-direction:column;gap:8px}
+  .tool{width:44px;height:44px;border-radius:14px;font-size:19px;display:flex;align-items:center;justify-content:center}
+  .tool.off{opacity:.45}
 
-  #toast { position:absolute; left:50%; top:90px; transform:translateX(-50%) translateY(-20px); z-index:2000; background:var(--gold); color:#1b1405; font-weight:700; padding:10px 16px; border-radius:12px; opacity:0; transition:all .35s; pointer-events:none; text-align:center; max-width:86%; }
-  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  /* walk button + live chip */
+  #walkWrap{position:absolute;left:0;right:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom) + 14px);z-index:1000;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+  #walkBtn{pointer-events:auto;background:linear-gradient(135deg,#ffd77e,#e8a93a);color:#2a1a02;font-weight:800;font-size:15px;padding:13px 26px;border-radius:30px;box-shadow:0 8px 24px rgba(232,169,58,.35)}
+  #walkBtn.on{background:linear-gradient(135deg,#7ff0aa,#3fbf75);color:#04210f;box-shadow:0 8px 24px rgba(95,211,141,.35)}
+  #live{pointer-events:auto;display:none;padding:6px 14px;font-size:12px;font-weight:700}
+  #live.show{display:block}
 
-  .sheet { position:absolute; left:0; right:0; bottom:0; z-index:3000; background:var(--panel); border-radius:20px 20px 0 0; padding:18px 16px calc(env(safe-area-inset-bottom) + 18px); max-height:78vh; overflow:auto; transform:translateY(105%); transition:transform .3s; box-shadow:0 -10px 40px rgba(0,0,0,.6); }
-  .sheet.open { transform:translateY(0); }
-  .sheet h2 { margin:0 0 4px; font-size:18px; color:var(--gold); }
-  .sheet .ar { font-size:15px; color:var(--muted); margin-bottom:10px; direction:rtl; }
-  .sheet p { font-size:14px; line-height:1.5; color:#cdd3df; }
-  .sheet .row { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
-  .sheet .row .btn { flex:1; }
-  .sheet img.ph { width:100%; border-radius:12px; margin-top:8px; }
-  #scrim { position:absolute; inset:0; z-index:2500; background:rgba(0,0,0,.45); display:none; }
-  #scrim.open { display:block; }
-  .list-item { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid rgba(255,255,255,.06); }
-  .list-item .ic { font-size:20px; width:28px; text-align:center; }
-  .list-item .nm { flex:1; font-size:14px; }
-  .list-item .nm small { display:block; color:var(--muted); font-size:11px; }
-  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; }
-  .grid img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; }
-  input[type=text] { width:100%; background:#0d121c; border:1px solid #2a3346; color:var(--text); border-radius:10px; padding:12px; font-size:15px; margin-top:6px; }
-  .stat { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-bottom:1px solid rgba(255,255,255,.05); }
-  .stat b { color:var(--gold); }
+  /* bottom nav */
+  #nav{position:absolute;left:0;right:0;bottom:0;height:calc(var(--navh) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:#11182b;border-top:1px solid var(--line);display:flex;z-index:1500}
+  #nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;color:var(--muted);font-weight:600}
+  #nav button b{font-size:21px;font-weight:400;filter:grayscale(.6);opacity:.8}
+  #nav button.act{color:var(--gold)}
+  #nav button.act b{filter:none;opacity:1}
 
-  .pin { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; border:2px solid var(--gold); background:#1a2030; box-shadow:0 0 12px rgba(230,195,106,.5); }
-  .pin.hidden { border-color:#555; color:#999; box-shadow:none; font-weight:800; font-size:16px; background:#11151f; }
-  .pin.done { border-color:var(--ok); box-shadow:0 0 12px rgba(95,211,141,.6); }
-  .pin.near { animation:pulse 1.2s infinite; }
-  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(230,195,106,.8)} 100%{box-shadow:0 0 0 16px rgba(230,195,106,0)} }
-  .me { width:18px; height:18px; border-radius:50%; background:#4ea3ff; border:3px solid #fff; box-shadow:0 0 0 6px rgba(78,163,255,.25); }
+  /* pages */
+  .page{position:absolute;left:0;right:0;top:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom));background:var(--bg);z-index:1200;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 16px) 14px 24px;display:none}
+  .page.show{display:block}
+  .page h1{font-size:22px;margin:0 0 4px;font-weight:800}
+  .page .lead{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+  .chip{padding:6px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--line);font-size:12px;white-space:nowrap;font-weight:600}
+  .chip.act{background:var(--gold);color:#2a1a02;border-color:var(--gold)}
+
+  .pcard{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px;margin-bottom:10px;align-items:center}
+  .pcard .th{width:74px;height:74px;border-radius:12px;flex:none;background:#25304d center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:28px;position:relative}
+  .pcard .th .ok{position:absolute;right:-4px;top:-4px;background:var(--ok);color:#04210f;border-radius:50%;width:22px;height:22px;font-size:13px;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .pcard .tx{flex:1;min-width:0}
+  .pcard .nm{font-weight:700;font-size:15px;line-height:1.25}
+  .pcard .ar{font-size:12px;color:var(--muted)}
+  .pcard .meta{font-size:11px;color:var(--muted);margin-top:3px}
+  .prog{height:4px;background:#26304b;border-radius:2px;margin-top:6px;overflow:hidden}
+  .prog>div{height:100%;background:var(--gold)}
+
+  /* stats */
+  .ring{display:flex;gap:16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+  .ring svg{flex:none}
+  .ring .big{font-size:26px;font-weight:800;color:var(--gold);line-height:1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+  .tile .v{font-size:22px;font-weight:800}
+  .tile .k{font-size:11px;color:var(--muted)}
+  .catrow{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:13px}
+  .catrow .cb{flex:1;height:8px;background:#26304b;border-radius:4px;overflow:hidden}
+  .catrow .cb>div{height:100%}
+  .sec{font-size:15px;font-weight:800;margin:18px 0 8px}
+  .walkrow{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:6px;font-size:13px}
+  .walkrow small{color:var(--muted)}
+
+  /* gallery */
+  .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+  .gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;display:block}
+  .galhead{font-size:13px;font-weight:700;margin:14px 0 6px;color:var(--gold)}
+  .empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px}
+  .empty b{display:block;font-size:40px;margin-bottom:8px}
+
+  /* sheet */
+  #scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:2500;display:none}
+  #scrim.open{display:block}
+  #sheet{position:absolute;left:0;right:0;bottom:0;z-index:3000;background:var(--panel);border-radius:22px 22px 0 0;max-height:88vh;overflow-y:auto;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);box-shadow:0 -12px 40px rgba(0,0,0,.6);padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
+  #sheet.open{transform:none}
+  .grab{width:40px;height:4px;border-radius:2px;background:#3a4566;margin:8px auto 0}
+  .sh{padding:12px 16px 0}
+  .sh h2{margin:0;font-size:20px;font-weight:800;line-height:1.2}
+  .sh .ar{color:var(--muted);font-size:15px;direction:rtl;text-align:left}
+  .sh p{font-size:14px;line-height:1.65;color:#d3d9e6;margin:8px 0}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+  .badge{font-size:12px;padding:4px 10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-weight:600}
+  .carousel{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 16px;margin-top:10px}
+  .carousel img{height:190px;border-radius:14px;scroll-snap-align:center;flex:none;max-width:85%;object-fit:cover;background:#25304d}
+  .hero{height:150px;margin:10px 16px 0;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:56px}
+  .shot{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--panel2);margin:6px 0}
+  .shot .ck{width:26px;height:26px;border-radius:50%;border:2px solid #4a5677;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .shot.done .ck{background:var(--ok);border-color:var(--ok);color:#04210f;font-weight:800}
+  .shot .t{flex:1;font-size:13px}
+  .shot img{width:44px;height:44px;border-radius:8px;object-fit:cover}
+  .shot button{background:var(--gold);color:#2a1a02;font-weight:800;padding:7px 10px;border-radius:10px;font-size:12px}
+  .shot button:disabled{background:#3a4566;color:#8a94ad}
+  .tip{background:rgba(242,198,109,.08);border:1px solid rgba(242,198,109,.25);border-radius:12px;padding:10px 12px;font-size:13px;margin:10px 0;line-height:1.55}
+  .row{display:flex;gap:8px;margin-top:12px}
+  .btn{flex:1;padding:12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);font-weight:700;font-size:14px;text-align:center;text-decoration:none;color:var(--text);display:block}
+  .btn.pri{background:var(--gold);color:#2a1a02;border-color:var(--gold)}
+  .btn.danger{color:var(--bad)}
+  .lnk{color:var(--gold);font-size:13px;text-decoration:none;font-weight:600}
+  label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:600}
+  input.f,select.f{width:100%;background:#0f1628;border:1px solid #2d3858;color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;font-size:15px}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{padding:7px 11px;border-radius:12px;background:#0f1628;border:1px solid #2d3858;font-size:13px}
+  .seg button.act{background:var(--gold);color:#2a1a02;border-color:var(--gold);font-weight:700}
+
+  /* summary */
+  .sumgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+  .sumgrid div{background:var(--panel2);border-radius:12px;padding:10px;text-align:center}
+  .sumgrid b{display:block;font-size:19px;color:var(--gold)}
+  .sumgrid span{font-size:11px;color:var(--muted)}
+
+  /* viewer */
+  #viewer{position:absolute;inset:0;background:rgba(5,8,16,.96);z-index:4000;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+  #viewer.open{display:flex}
+  #viewer img{max-width:100%;max-height:72vh;border-radius:12px}
+  #viewer .cap{margin-top:12px;text-align:center;font-size:14px}
+  #viewer .cap small{display:block;color:var(--muted)}
+  #viewer .vnav{display:flex;gap:10px;margin-top:14px;width:100%;max-width:360px}
+
+  /* toast */
+  #toast{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 74px);transform:translate(-50%,-16px);z-index:5000;background:var(--gold);color:#2a1a02;font-weight:800;padding:10px 16px;border-radius:14px;opacity:0;transition:all .35s;pointer-events:none;text-align:center;max-width:88%;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* markers */
+  .pin{display:flex;flex-direction:column;align-items:center}
+  .pin .c{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:#1a2340 center/cover;border:2.5px solid var(--gold);box-shadow:0 3px 10px rgba(0,0,0,.5);position:relative}
+  .pin.done .c{border-color:var(--ok);box-shadow:0 0 0 3px rgba(95,211,141,.35),0 3px 10px rgba(0,0,0,.5)}
+  .pin.done .c:after{content:"✓";position:absolute;right:-5px;bottom:-3px;background:var(--ok);color:#04210f;font-size:10px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .pin.near .c{animation:pulse 1.3s infinite}
+  .pin .l{margin-top:3px;font-size:11px;font-weight:700;color:#fff;background:rgba(14,20,36,.82);padding:1px 7px;border-radius:8px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+  .hidelabels .pin .l{display:none}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(242,198,109,.9)}100%{box-shadow:0 0 0 18px rgba(242,198,109,0)}}
+  .me{width:20px;height:20px;border-radius:50%;background:#4ea3ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(78,163,255,.25)}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
 <div id="hud">
-  <div class="card" id="lvl">
-    <div class="title" id="lvlTitle">Lv 1 · Stranger</div>
-    <div class="sub" id="lvlSub">0 XP</div>
+  <div class="glass" id="lvl" data-go="stats">
+    <div id="lvlTitle">Lv 1 · Stranger</div>
+    <div id="lvlSub">0 XP</div>
     <div id="bar"><div></div></div>
   </div>
-  <div class="card" id="gps"><span class="dot" id="gpsDot"></span><span id="gpsTxt">GPS off</span></div>
+  <div class="glass" id="gps"><i id="gpsDot"></i><span id="gpsTxt">GPS off</span></div>
 </div>
 
-<div id="bottom">
-  <button class="btn" id="btnQuests">🗺️ Quests</button>
-  <button class="btn primary" id="btnWalk">▶ Start walk</button>
-  <button class="btn" id="btnMenu">☰</button>
+<div id="tools">
+  <button class="glass tool" id="tFog" title="Fog">🌫️</button>
+  <button class="glass tool" id="tTrail" title="Trails">〰️</button>
+  <button class="glass tool" id="tMe" title="Center on me">📍</button>
 </div>
 
-<div id="toast"></div>
+<div id="walkWrap">
+  <div class="glass" id="live"></div>
+  <button id="walkBtn">▶ Start walk</button>
+</div>
+
+<!-- pages -->
+<div class="page" id="pg-places">
+  <h1>Places</h1>
+  <p class="lead">Long-press anywhere on the map to add your own.</p>
+  <div class="chips" id="placeFilters"></div>
+  <div id="placeList"></div>
+</div>
+<div class="page" id="pg-gallery">
+  <h1>Gallery</h1>
+  <p class="lead">Every shot you've taken, by place.</p>
+  <div id="galBody"></div>
+</div>
+<div class="page" id="pg-stats">
+  <h1>Your Damascus</h1>
+  <p class="lead" id="statsLead"></p>
+  <div id="statsBody"></div>
+</div>
+
+<nav id="nav">
+  <button data-go="map" class="act"><b>🗺️</b>Map</button>
+  <button data-go="places"><b>📍</b>Places</button>
+  <button data-go="gallery"><b>🖼️</b>Gallery</button>
+  <button data-go="stats"><b>📊</b>Stats</button>
+</nav>
+
 <div id="scrim"></div>
-<div class="sheet" id="sheet"></div>
+<div id="sheet"></div>
+<div id="viewer"></div>
+<div id="toast"></div>
 
 <input type="file" id="fileEnv" accept="image/*" capture="environment" hidden>
 <input type="file" id="fileUser" accept="image/*" capture="user" hidden>
@@ -95,413 +220,578 @@
 (() => {
 'use strict';
 
-// ---------- Settings ----------
-const CELL = 0.00015;          // grid cell size in degrees (~15m)
-const REVEAL_M = 45;           // fog cleared around you, in metres
-const UNLOCK_M = 120;          // how close you must be to unlock a quest
-const HINT_M = 250;            // quest names appear once you've explored this close
-const MAX_ACC = 60;            // ignore GPS fixes worse than this (metres)
-const XP_CELL = 1, XP_QUEST = 60;
+/* ================= Settings ================= */
+const CELL = 0.00015;      // ~15 m grid
+const REVEAL_M = 45;       // fog cleared around you
+const NEAR_M = 150;        // how close to take a place's shots
+const MAX_ACC = 60;        // ignore fixes worse than this
+const MIN_STEP = 8;        // metres between trail points
+const XP = { cell:1, visit:50, shot:20, full:40 };
 const START = [33.5110, 36.3050];
 
-// ---------- Built-in quests (coordinates approximate; unlock radius is generous) ----------
-const BASE_QUESTS = [
-  { id:'umayyad',  ic:'🕌', name:'Umayyad Mosque', ar:'الجامع الأموي', lat:33.5115, lng:36.3066, kind:'photo', task:'Photograph the courtyard mosaics or the Minaret of Jesus.' },
-  { id:'azem',     ic:'🏛️', name:'Azem Palace', ar:'قصر العظم', lat:33.5095, lng:36.3069, kind:'photo', task:'Find the courtyard fountain and capture it.' },
-  { id:'hamidiyya',ic:'🛍️', name:'Souq al-Hamidiyya', ar:'سوق الحميدية', lat:33.5112, lng:36.3035, kind:'photo', task:'Capture the light coming through the bullet holes in the roof.' },
-  { id:'bakdash',  ic:'🍨', name:'Bakdash', ar:'بكداش', lat:33.5112, lng:36.3043, kind:'selfie', task:'Selfie with a bouza. Non-negotiable.' },
-  { id:'citadel',  ic:'🏰', name:'Citadel of Damascus', ar:'قلعة دمشق', lat:33.5117, lng:36.3015, kind:'photo', task:'Photograph the walls from the Saladin statue side.' },
-  { id:'khan',     ic:'🐪', name:'Khan As\'ad Pasha', ar:'خان أسعد باشا', lat:33.5098, lng:36.3074, kind:'photo', task:'Look straight up at the domes and shoot.' },
-  { id:'bimaristan',ic:'⚕️', name:'Bimaristan Nur al-Din', ar:'البيمارستان النوري', lat:33.5101, lng:36.3034, kind:'photo', task:'A 12th-century hospital. Find its doorway.' },
-  { id:'qaymariyya',ic:'☕', name:'Al-Qaymariyya', ar:'القيمرية', lat:33.5120, lng:36.3100, kind:'selfie', task:'Get lost in the alleys, then a selfie at the first café you find.' },
-  { id:'babtouma', ic:'🚪', name:'Bab Touma', ar:'باب توما', lat:33.5139, lng:36.3164, kind:'photo', task:'Photograph the gate itself.' },
-  { id:'hananiya', ic:'⛪', name:'Chapel of Ananias', ar:'كنيسة حنانيا', lat:33.5116, lng:36.3182, kind:'photo', task:'Find the underground chapel.' },
-  { id:'babsharqi',ic:'🌅', name:'Bab Sharqi & Straight Street', ar:'باب شرقي والشارع المستقيم', lat:33.5097, lng:36.3195, kind:'photo', task:'Walk Straight Street end to end. Photo at the eastern gate.' },
-  { id:'takiyya',  ic:'🕌', name:'Takiyya Sulaymaniyya', ar:'التكية السليمانية', lat:33.5138, lng:36.2910, kind:'photo', task:'Capture the twin minarets.' },
-  { id:'museum',   ic:'🏺', name:'National Museum', ar:'المتحف الوطني', lat:33.5126, lng:36.2888, kind:'photo', task:'The gate of Qasr al-Hayr is the entrance itself.' },
-  { id:'hejaz',    ic:'🚂', name:'Hejaz Railway Station', ar:'محطة الحجاز', lat:33.5108, lng:36.2918, kind:'photo', task:'Photograph the painted ceiling.' },
-  { id:'marjeh',   ic:'🗿', name:'Marjeh Square', ar:'ساحة المرجة', lat:33.5106, lng:36.2995, kind:'photo', task:'Find the old column monument.' },
-  { id:'sarouja',  ic:'🏚️', name:'Sarouja', ar:'ساروجة', lat:33.5178, lng:36.3020, kind:'photo', task:'"Little Istanbul." Find an Ottoman house door.' },
-  { id:'ibnarabi', ic:'📿', name:'Muhyiddin Ibn Arabi Mosque', ar:'جامع الشيخ محيي الدين', lat:33.5297, lng:36.2905, kind:'photo', task:'Walk up through the Salihiyya souq to get here.' },
-  { id:'qasioun',  ic:'⛰️', name:'Qasioun lookout', ar:'جبل قاسيون', lat:33.5370, lng:36.2870, kind:'selfie', task:'Selfie with the whole city lit up behind you. Go at night.' },
-  { id:'midan',    ic:'🥙', name:'Al-Midan', ar:'الميدان', lat:33.4990, lng:36.3010, kind:'selfie', task:'Eat something you\'ve never ordered before. Selfie with it.' },
-  { id:'tishreen', ic:'🌳', name:'Tishreen Park', ar:'حديقة تشرين', lat:33.5195, lng:36.2735, kind:'photo', task:'Find the quietest corner of the park.' }
-];
-
+const CATS = {
+  heritage:{ n:'Heritage', ic:'🏛️', c:'#f2c66d' },
+  faith:   { n:'Faith',    ic:'🕌', c:'#7fb3ff' },
+  souq:    { n:'Souqs',    ic:'🛍️', c:'#f08a5d' },
+  quarter: { n:'Quarters', ic:'🏘️', c:'#c49bff' },
+  food:    { n:'Food',     ic:'🍽️', c:'#ff7a9c' },
+  views:   { n:'Views',    ic:'⛰️', c:'#8fd18f' },
+  parks:   { n:'Parks',    ic:'🌳', c:'#5fd38d' },
+  mine:    { n:'My spots', ic:'⭐', c:'#ffdf9a' }
+};
+const TIMES = { day:'☀️ Daytime', sunset:'🌅 Golden hour', night:'🌙 Night', any:'🕐 Anytime' };
 const TITLES = ['Stranger','Passer-by','Wanderer','Explorer','Pathfinder','Alley Runner','Old City Ranger','Cartographer','Ibn Battuta Jr.','Shaykh al-Hara'];
 
-// ---------- Storage ----------
+/* ================= Built-in places ================= */
+// Coordinates are approximate; the 150 m radius covers small errors.
+const BASE = [
+ { id:'umayyad', cat:'faith', name:'Umayyad Mosque', ar:'الجامع الأموي', lat:33.5115, lng:36.3066, time:'sunset', q:'Umayyad Mosque Damascus',
+   bio:'Built in the early 8th century under Caliph al-Walid I, on ground that had held a Roman temple of Jupiter and then a church of John the Baptist. Its golden mosaics are among the oldest surviving in Islamic art, and a shrine inside is traditionally said to hold the head of the Prophet Yahya.',
+   shots:['The golden mosaics on the courtyard walls','The Minaret of Jesus from the courtyard','The courtyard at golden hour, with people in it'],
+   tip:'Dress modestly; women are given a cloak at the entrance. The marble courtyard glows just before sunset.' },
+ { id:'azem', cat:'heritage', name:'Azem Palace', ar:'قصر العظم', lat:33.5095, lng:36.3069, time:'day', q:'Azm Palace Damascus',
+   bio:'An Ottoman governor\'s residence built around 1750 by As\'ad Pasha al-Azm. The striped black-and-white stonework (ablaq), shaded courtyards and painted wooden ceilings make it the classic Damascene house, scaled up to a palace. Today it houses a museum of popular traditions.',
+   shots:['The main courtyard fountain','A striped ablaq wall or archway','A painted wooden ceiling'],
+   tip:'Go mid-morning when the courtyard is quiet and the light is soft.' },
+ { id:'hamidiyya', cat:'souq', name:'Souq al-Hamidiyya', ar:'سوق الحميدية', lat:33.5112, lng:36.3035, time:'day', q:'Al-Hamidiyah Souq',
+   bio:'The great covered market of the Old City, roofed in iron during the late Ottoman era and named after Sultan Abdul Hamid. The small holes in its roof let in beams of sunlight; at its far end it opens onto the Roman columns of the old Temple of Jupiter.',
+   shots:['Sunbeams coming through the holes in the roof','The Roman columns at the mosque end','A shopfront that catches your eye'],
+   tip:'Around noon the light beams through the roof are strongest.' },
+ { id:'bakdash', cat:'food', name:'Bakdash', ar:'بكداش', lat:33.5112, lng:36.3043, time:'any', q:'Bakdash ice cream Damascus',
+   bio:'The legendary ice-cream parlour inside Souq al-Hamidiyya, serving bouza since the late 19th century: stretchy, mastic-scented ice cream pounded by hand in big wooden vats and rolled in pistachios.',
+   shots:['Selfie with your bouza','The pounding of the ice cream','The crowd at the counter'],
+   tip:'Order the classic with pistachios. Watch the pounding before you eat.', selfie:true },
+ { id:'citadel', cat:'heritage', name:'Citadel of Damascus', ar:'قلعة دمشق', lat:33.5117, lng:36.3015, time:'sunset', q:'Citadel of Damascus',
+   bio:'A fortress at the northwest corner of the Old City walls. Its present form is mostly Ayyubid, rebuilt in the early 13th century. Unusually, it sits on flat ground rather than a hill, built into the city itself. The equestrian statue of Saladin stands just outside.',
+   shots:['The walls and towers','The Saladin statue','A gate or doorway in the walls'],
+   tip:'The walls turn honey-coloured in late afternoon.' },
+ { id:'khan', cat:'heritage', name:'Khan As\'ad Pasha', ar:'خان أسعد باشا', lat:33.5098, lng:36.3074, time:'day', q:'Khan As\'ad Pasha',
+   bio:'The grandest caravanserai of the Old City, built in the 1750s by the same governor as the Azem Palace. Merchants and their goods once filled its two storeys around a courtyard crowned with domes.',
+   shots:['Looking straight up at the domes','The courtyard from the upper gallery','The great entrance gate'],
+   tip:'Lie down on the bench (or just look up) to frame the domes.' },
+ { id:'bimaristan', cat:'heritage', name:'Bimaristan Nur al-Din', ar:'البيمارستان النوري', lat:33.5101, lng:36.3034, time:'day', q:'Nur al-Din Bimaristan',
+   bio:'A hospital founded in the 12th century by Nur al-Din Zengi, and a medical school for centuries after. Its doorway is crowned with honeycomb muqarnas. It now holds a museum of medicine and science in the Arab world.',
+   shots:['The muqarnas above the doorway','The courtyard pool','An old instrument or manuscript'],
+   tip:'Small, calm, and often overlooked by people heading to the souq.' },
+ { id:'qaymariyya', cat:'quarter', name:'Al-Qaymariyya', ar:'القيمرية', lat:33.5120, lng:36.3100, time:'night', q:'Qaymariyya Damascus',
+   bio:'A tangle of alleys east of the Umayyad Mosque, full of old houses turned into cafés and small shops. Near the mosque\'s eastern steps is the old Al-Nawfara café, where storytellers (hakawati) traditionally performed.',
+   shots:['Selfie at the first café you find','An alley lit up at night','The steps by the mosque\'s eastern gate'],
+   tip:'Get deliberately lost. The point is the alley you didn\'t plan to take.', selfie:true },
+ { id:'babtouma', cat:'quarter', name:'Bab Touma', ar:'باب توما', lat:33.5139, lng:36.3164, time:'night', q:'Bab Tuma',
+   bio:'One of the Old City\'s ancient gates, named after the Apostle Thomas. It opens onto the Christian Quarter, whose narrow streets fill with restaurants and life in the evening.',
+   shots:['The gate itself','A busy street in the quarter at night','A church bell tower'],
+   tip:'Best after dark, when the quarter wakes up.' },
+ { id:'hananiya', cat:'faith', name:'Chapel of Ananias', ar:'كنيسة حنانيا', lat:33.5116, lng:36.3182, time:'day', q:'Chapel of Saint Ananias',
+   bio:'A small underground chapel, traditionally the house of Ananias, who is said to have baptised Saint Paul in Damascus. You reach it down a short flight of steps below street level.',
+   shots:['The stairs leading down','The vaulted interior','The entrance from the street'],
+   tip:'Quiet and tiny. Five minutes, but it stays with you.' },
+ { id:'babsharqi', cat:'heritage', name:'Bab Sharqi & Straight Street', ar:'باب شرقي والشارع المستقيم', lat:33.5097, lng:36.3195, time:'sunset', q:'Straight Street Damascus',
+   bio:'Straight Street was the main Roman road through Damascus, the Via Recta mentioned in the Book of Acts. It runs east–west through the Old City and ends at Bab Sharqi, the Roman eastern gate.',
+   shots:['The arches of Bab Sharqi','The Roman arch along Straight Street','The street lit up at dusk'],
+   tip:'Walk it end to end, west to east, and finish at the gate at sunset.' },
+ { id:'takiyya', cat:'faith', name:'Takiyya Sulaymaniyya', ar:'التكية السليمانية', lat:33.5138, lng:36.2910, time:'day', q:'Tekkiye Mosque Damascus',
+   bio:'An Ottoman complex built in the 1550s for Suleiman the Magnificent, designed by the great architect Sinan. Its twin pencil minarets rise over a garden and pool, and its old rooms house craftsmen\'s workshops.',
+   shots:['The twin minarets','The minarets reflected in the pool','A craftsman at work'],
+   tip:'Pair it with the National Museum next door.' },
+ { id:'museum', cat:'heritage', name:'National Museum', ar:'المتحف الوطني', lat:33.5126, lng:36.2888, time:'day', q:'National Museum of Damascus',
+   bio:'Syria\'s main museum. Its entrance is the reassembled gateway of Qasr al-Hayr al-Gharbi, an 8th-century Umayyad desert palace. Inside are treasures from Ugarit, Mari and Palmyra.',
+   shots:['The palace gateway at the entrance','A statue in the garden','The garden from the gate'],
+   tip:'Photography inside may be restricted; the garden and gate are always fair game.' },
+ { id:'hejaz', cat:'heritage', name:'Hejaz Railway Station', ar:'محطة الحجاز', lat:33.5108, lng:36.2918, time:'day', q:'Hejaz railway station Damascus',
+   bio:'The early-20th-century terminus of the Hejaz Railway, the Ottoman line built to carry pilgrims from Damascus toward Medina. The building has a richly painted wooden ceiling.',
+   shots:['The station facade','The painted ceiling inside','An old locomotive'],
+   tip:'Look up the moment you step inside.' },
+ { id:'marjeh', cat:'heritage', name:'Marjeh Square', ar:'ساحة المرجة', lat:33.5106, lng:36.2995, time:'day', q:'Marjeh Square',
+   bio:'Also called Martyrs\' Square, the old heart of modern Damascus. Its bronze column monument commemorates the telegraph line that linked Damascus to Medina in the Ottoman era.',
+   shots:['The column monument','The square from one corner','An old hotel or building facade'],
+   tip:'Good stop between the Hejaz Station and the Old City.' },
+ { id:'sarouja', cat:'quarter', name:'Sarouja', ar:'ساروجة', lat:33.5178, lng:36.3020, time:'day', q:'Saruja Damascus',
+   bio:'An old quarter just outside the walls, once nicknamed "Little Istanbul" for the Ottoman officials who lived there. Many of its old courtyard houses survive behind plain doors.',
+   shots:['An old Ottoman door','A courtyard if you can glimpse one','A narrow alley'],
+   tip:'Walk slowly. The beauty here hides behind doors.' },
+ { id:'ibnarabi', cat:'faith', name:'Muhyiddin Ibn Arabi Mosque', ar:'جامع الشيخ محيي الدين', lat:33.5297, lng:36.2905, time:'day', q:'Ibn Arabi mosque Damascus',
+   bio:'The mosque and tomb of the great Andalusian mystic Ibn Arabi, who died in Damascus in 1240. The current mosque was built in the 16th century, on the slopes of Salihiyya, surrounded by a lively souq.',
+   shots:['The souq on the way up','The mosque entrance','A view down the slope'],
+   tip:'Walk up through the Salihiyya souq. The approach is half the visit.' },
+ { id:'qasioun', cat:'views', name:'Qasioun lookout', ar:'جبل قاسيون', lat:33.5370, lng:36.2870, time:'night', q:'Mount Qasioun',
+   bio:'The mountain that frames Damascus from the northwest. From its slopes the whole city spreads out below you, best of all at night as the lights come on.',
+   shots:['Selfie with the city lights behind you','The city panorama','The sunset over the city'],
+   tip:'Arrive just before sunset and stay for the lights.', selfie:true },
+ { id:'midan', cat:'food', name:'Al-Midan', ar:'الميدان', lat:33.4990, lng:36.3010, time:'night', q:'Al-Midan Damascus',
+   bio:'The old southern district along the road that once led pilgrims south. Today it is Damascus\'s great food street, packed with sweets shops, grills and fatteh places, especially busy at night.',
+   shots:['Selfie with something you\'ve never ordered','A sweets shop window','The street at night'],
+   tip:'Come hungry and order one thing you\'ve never tried.', selfie:true },
+ { id:'tishreen', cat:'parks', name:'Tishreen Park', ar:'حديقة تشرين', lat:33.5195, lng:36.2735, time:'day', q:'Tishreen Park Damascus',
+   bio:'The largest park in Damascus, a long green stretch of lawns and trees where families come on weekends.',
+   shots:['The quietest corner you can find','A tree that stands out','Light through the leaves'],
+   tip:'A good place to sit and read after a long walk.' }
+];
+
+/* ================= Storage ================= */
 const LS = {
-  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
-  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ toast('⚠️ Storage full or blocked'); } }
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ toast('⚠️ Storage is full. Export a backup.'); } }
 };
-let cells = new Set(LS.get('ud_cells', []));
-let done = LS.get('ud_done', {});           // id -> timestamp
-let custom = LS.get('ud_custom', []);       // user-added quests
-let bonusXp = LS.get('ud_bonus', 0);
-let lastPos = null;
-const saveCells = debounce(() => LS.set('ud_cells', [...cells]), 1500);
+let cells  = new Set(LS.get('ud_cells',[]));
+let visits = LS.get('ud_visits',{});   // placeId -> ts
+let shots  = LS.get('ud_shots',{});    // placeId#i -> ts
+let custom = LS.get('ud_custom2',[]);
+let walks  = LS.get('ud_walks',[]);
+let teasers= LS.get('ud_teasers',{});  // placeId -> {photos:[], extract, url}
+let settings = Object.assign({ fog:true, trails:true }, LS.get('ud_settings',{}));
+const saveCells = debounce(()=>LS.set('ud_cells',[...cells]),1500);
 
-let db = null;
-function openDB(){
-  return new Promise(res => {
-    try {
-      const r = indexedDB.open('unfog', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('photos');
-      r.onsuccess = () => { db = r.result; res(db); };
-      r.onerror = () => res(null);
-    } catch(e){ res(null); }
-  });
-}
-function putPhoto(id, data){ return new Promise(res => { if(!db) return res(false); const t = db.transaction('photos','readwrite'); t.objectStore('photos').put(data, id); t.oncomplete = () => res(true); t.onerror = () => res(false); }); }
-function getPhoto(id){ return new Promise(res => { if(!db) return res(null); const q = db.transaction('photos').objectStore('photos').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); }
-function allPhotos(){ return new Promise(res => { if(!db) return res({}); const out = {}; const q = db.transaction('photos').objectStore('photos').openCursor(); q.onsuccess = e => { const c = e.target.result; if(c){ out[c.key] = c.value; c.continue(); } else res(out); }; q.onerror = () => res(out); }); }
-try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+let db=null;
+function openDB(){ return new Promise(res=>{ try{ const r=indexedDB.open('unfog',1); r.onupgradeneeded=()=>r.result.createObjectStore('photos'); r.onsuccess=()=>{db=r.result;res(db)}; r.onerror=()=>res(null);}catch(e){res(null)} }); }
+function idb(mode,fn){ return new Promise(res=>{ if(!db) return res(null); try{ const t=db.transaction('photos',mode); const s=t.objectStore('photos'); const r=fn(s); t.oncomplete=()=>res(r&&r.result!==undefined?r.result:true); t.onerror=()=>res(null);}catch(e){res(null)} }); }
+const putPhoto=(k,v)=>idb('readwrite',s=>s.put(v,k));
+const getPhoto=k=>idb('readonly',s=>s.get(k));
+const delPhoto=k=>idb('readwrite',s=>s.delete(k));
+function allPhotos(){ return new Promise(res=>{ if(!db) return res({}); const o={}; const q=db.transaction('photos').objectStore('photos').openCursor(); q.onsuccess=e=>{const c=e.target.result; if(c){o[c.key]=c.value;c.continue();} else res(o);}; q.onerror=()=>res(o); }); }
+try{ navigator.storage&&navigator.storage.persist&&navigator.storage.persist(); }catch(e){}
 
-// ---------- Helpers ----------
-function debounce(f, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; }
-function key(lat, lng){ return Math.round(lat / CELL) + ',' + Math.round(lng / CELL); }
-function cellCenter(k){ const [a, b] = k.split(',').map(Number); return [a * CELL, b * CELL]; }
-function dist(a1, o1, a2, o2){
-  const R = 6371000, r = Math.PI / 180;
-  const dA = (a2 - a1) * r, dO = (o2 - o1) * r;
-  const h = Math.sin(dA/2)**2 + Math.cos(a1*r) * Math.cos(a2*r) * Math.sin(dO/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-function allQuests(){ return BASE_QUESTS.concat(custom); }
-function totalXp(){ return cells.size * XP_CELL + Object.keys(done).length * XP_QUEST + bonusXp; }
-function levelInfo(xp){
-  let lv = 1; const need = l => Math.round(150 * Math.pow(l, 1.6));
-  let base = 0;
-  while (xp >= base + need(lv)) { base += need(lv); lv++; }
-  return { lv, into: xp - base, need: need(lv), title: TITLES[Math.min(lv - 1, TITLES.length - 1)] };
-}
-let toastT;
-function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
-function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function vibrate(p){ try { navigator.vibrate && navigator.vibrate(p); } catch(e){} }
+/* ================= Helpers ================= */
+function debounce(f,ms){ let t; return (...a)=>{clearTimeout(t);t=setTimeout(()=>f(...a),ms);}; }
+const $=id=>document.getElementById(id);
+function key(a,o){ return Math.round(a/CELL)+','+Math.round(o/CELL); }
+function cellCenter(k){ const [a,b]=k.split(',').map(Number); return [a*CELL,b*CELL]; }
+function dist(a1,o1,a2,o2){ const R=6371000,r=Math.PI/180,dA=(a2-a1)*r,dO=(o2-o1)*r; const h=Math.sin(dA/2)**2+Math.cos(a1*r)*Math.cos(a2*r)*Math.sin(dO/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtD(m){ return m<1000? Math.round(m)+' m' : (m/1000).toFixed(m<10000?2:1)+' km'; }
+function fmtT(ms){ const m=Math.round(ms/60000); return m<60? m+' min' : Math.floor(m/60)+'h '+(m%60)+'m'; }
+function vibrate(p){ try{ navigator.vibrate&&navigator.vibrate(p);}catch(e){} }
+let toastT; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800); }
+const places=()=>BASE.concat(custom);
+const placeById=id=>places().find(p=>p.id===id);
+const shotsDone=p=>p.shots.filter((_,i)=>shots[p.id+'#'+i]).length;
+function totalXp(){ let x=cells.size*XP.cell+Object.keys(visits).length*XP.visit+Object.keys(shots).length*XP.shot; for(const p of places()) if(p.shots.length&&shotsDone(p)===p.shots.length) x+=XP.full; return x; }
+function levelInfo(xp){ const need=l=>Math.round(150*Math.pow(l,1.6)); let lv=1,base=0; while(xp>=base+need(lv)){base+=need(lv);lv++;} return {lv,into:xp-base,need:need(lv),title:TITLES[Math.min(lv-1,TITLES.length-1)]}; }
+function totalDist(){ return walks.reduce((s,w)=>s+(w.dist||0),0)+(cur?cur.dist:0); }
 
-// ---------- Map ----------
-const map = L.map('map', { zoomControl:false, zoomAnimation:false, attributionControl:true }).setView(LS.get('ud_view', START), LS.get('ud_zoom', 15));
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, subdomains:'abc', attribution:'© OpenStreetMap' }).addTo(map);
-map.on('moveend', () => { LS.set('ud_view', [map.getCenter().lat, map.getCenter().lng]); LS.set('ud_zoom', map.getZoom()); });
+/* ================= Map ================= */
+const map=L.map('map',{zoomControl:false,zoomAnimation:false,attributionControl:true}).setView(LS.get('ud_view',START),LS.get('ud_zoom',15));
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+map.on('moveend',()=>{ const c=map.getCenter(); LS.set('ud_view',[c.lat,c.lng]); LS.set('ud_zoom',map.getZoom()); });
+map.on('zoomend',()=>$('map').classList.toggle('hidelabels',map.getZoom()<17));
+$('map').classList.toggle('hidelabels',map.getZoom()<17);
 
-// Fog layer: a canvas in its own pane between tiles and markers
-map.createPane('fog'); map.getPane('fog').style.zIndex = 450; map.getPane('fog').style.pointerEvents = 'none';
-const fog = document.createElement('canvas'); fog.style.position = 'absolute';
-map.getPane('fog').appendChild(fog);
-const brush = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
-  const gr = g.createRadialGradient(64,64,0,64,64,64);
-  gr.addColorStop(0,'rgba(0,0,0,1)'); gr.addColorStop(.55,'rgba(0,0,0,1)'); gr.addColorStop(1,'rgba(0,0,0,0)');
-  g.fillStyle = gr; g.fillRect(0,0,128,128); return c;
-})();
+/* ---- fog ---- */
+map.createPane('fog'); map.getPane('fog').style.zIndex=450; map.getPane('fog').style.pointerEvents='none';
+map.createPane('trails'); map.getPane('trails').style.zIndex=460; map.getPane('trails').style.pointerEvents='none';
+const fog=document.createElement('canvas'); fog.style.position='absolute'; map.getPane('fog').appendChild(fog);
+const brush=(()=>{ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d'); const gr=g.createRadialGradient(64,64,0,64,64,64); gr.addColorStop(0,'rgba(0,0,0,1)'); gr.addColorStop(.5,'rgba(0,0,0,1)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(0,0,128,128); return c; })();
+const clouds=(()=>{ // soft cloud texture, tileable-ish
+  const c=document.createElement('canvas'); c.width=c.height=512; const g=c.getContext('2d');
+  let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; };
+  for(let i=0;i<70;i++){ const x=rnd()*512,y=rnd()*512,r=40+rnd()*110; for(const dx of [-512,0,512]) for(const dy of [-512,0,512]){ const gr=g.createRadialGradient(x+dx,y+dy,0,x+dx,y+dy,r); const a=.05+rnd()*.07; gr.addColorStop(0,`rgba(190,205,240,${a})`); gr.addColorStop(1,'rgba(190,205,240,0)'); g.fillStyle=gr; g.fillRect(x+dx-r,y+dy-r,r*2,r*2);} }
+  return c; })();
 function drawFog(){
-  const size = map.getSize(), dpr = Math.min(window.devicePixelRatio || 1, 2);
-  fog.width = size.x * dpr; fog.height = size.y * dpr;
-  fog.style.width = size.x + 'px'; fog.style.height = size.y + 'px';
-  L.DomUtil.setPosition(fog, map.containerPointToLayerPoint([0,0]));
-  const g = fog.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
-  g.globalCompositeOperation = 'source-over';
-  g.fillStyle = 'rgba(6,9,16,0.9)'; g.fillRect(0,0,size.x,size.y);
-  // subtle texture
-  g.fillStyle = 'rgba(230,195,106,0.03)';
-  for (let i = 0; i < 40; i++) g.fillRect((i * 97) % size.x, (i * 53) % size.y, 2, 2);
-  const lat = map.getCenter().lat, z = map.getZoom();
-  const mpp = 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z + 8);
-  const r = Math.max(REVEAL_M / mpp, 3);
-  const b = map.getBounds().pad(0.1);
-  g.globalCompositeOperation = 'destination-out';
-  for (const k of cells) {
-    const [a, o] = cellCenter(k);
-    if (a < b.getSouth() || a > b.getNorth() || o < b.getWest() || o > b.getEast()) continue;
-    const p = map.latLngToContainerPoint([a, o]);
-    g.drawImage(brush, p.x - r, p.y - r, r * 2, r * 2);
-  }
+  const size=map.getSize(), dpr=Math.min(window.devicePixelRatio||1,2);
+  fog.width=size.x*dpr; fog.height=size.y*dpr; fog.style.width=size.x+'px'; fog.style.height=size.y+'px';
+  L.DomUtil.setPosition(fog,map.containerPointToLayerPoint([0,0]));
+  const g=fog.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,size.x,size.y);
+  if(!settings.fog) return;
+  g.globalCompositeOperation='source-over';
+  const gr=g.createLinearGradient(0,0,size.x*.4,size.y);
+  gr.addColorStop(0,'rgba(38,48,86,0.80)'); gr.addColorStop(.55,'rgba(28,36,66,0.78)'); gr.addColorStop(1,'rgba(46,36,70,0.80)');
+  g.fillStyle=gr; g.fillRect(0,0,size.x,size.y);
+  const o=map.latLngToContainerPoint(START);
+  const pat=g.createPattern(clouds,'repeat'); pat.setTransform(new DOMMatrix().translate(((o.x%512)+512)%512,((o.y%512)+512)%512));
+  g.fillStyle=pat; g.fillRect(0,0,size.x,size.y);
+  const mpp=40075016.686*Math.cos(map.getCenter().lat*Math.PI/180)/Math.pow(2,map.getZoom()+8);
+  const r=Math.max(REVEAL_M/mpp,3), b=map.getBounds().pad(.1);
+  g.globalCompositeOperation='destination-out';
+  for(const k of cells){ const [a,lo]=cellCenter(k); if(a<b.getSouth()||a>b.getNorth()||lo<b.getWest()||lo>b.getEast()) continue; const p=map.latLngToContainerPoint([a,lo]); g.drawImage(brush,p.x-r,p.y-r,r*2,r*2); }
 }
-map.on('move zoom resize viewreset', drawFog);
+map.on('move zoom resize viewreset',drawFog);
 
-// ---------- Quest markers ----------
-const markers = {};
-function isHinted(q){
-  if (done[q.id] || q.custom) return true;
-  const rad = Math.ceil(HINT_M / 15);
-  const ck = Math.round(q.lat / CELL), cg = Math.round(q.lng / CELL);
-  for (let i = -rad; i <= rad; i += 2) for (let j = -rad; j <= rad; j += 2) if (cells.has((ck + i) + ',' + (cg + j))) return true;
-  return false;
+/* ---- trails ---- */
+const trailLayer=L.layerGroup().addTo(map);
+let liveLine=null, liveGlow=null;
+function lineFor(pts,live){
+  const glow=L.polyline(pts,{pane:'trails',color:live?'#7ff0aa':'#ffd77e',weight:12,opacity:.35,lineCap:'round',lineJoin:'round',interactive:false});
+  const core=L.polyline(pts,{pane:'trails',color:live?'#b9ffd3':'#ffe08a',weight:4,opacity:1,lineCap:'round',lineJoin:'round',interactive:false});
+  return [glow,core];
+}
+function drawTrails(){
+  trailLayer.clearLayers(); liveLine=liveGlow=null;
+  if(!settings.trails) return;
+  for(const w of walks) if(w.pts.length>1) lineFor(w.pts).forEach(l=>l.addTo(trailLayer));
+  if(cur&&cur.pts.length>1){ [liveGlow,liveLine]=lineFor(cur.pts,true); liveGlow.addTo(trailLayer); liveLine.addTo(trailLayer); }
+}
+
+/* ---- place markers ---- */
+const markers={};
+let lastPos=null;
+function pinHtml(p){
+  const t=teasers[p.id], img=t&&t.photos&&t.photos[0];
+  const near=lastPos&&!visits[p.id]&&dist(lastPos[0],lastPos[1],p.lat,p.lng)<=NEAR_M;
+  const cls='pin'+(visits[p.id]?' done':'')+(near?' near':'');
+  const bg=img?`background-image:url('${img}');`:'';
+  return `<div class="${cls}"><div class="c" style="${bg}border-color:${visits[p.id]?'':CATS[p.cat].c}">${img?'':CATS[p.cat].ic}</div><div class="l">${esc(p.name)}</div></div>`;
 }
 function renderMarkers(){
-  const here = lastPos;
-  for (const q of allQuests()) {
-    const hinted = isHinted(q), isDone = !!done[q.id];
-    const near = here && !isDone && dist(here[0], here[1], q.lat, q.lng) <= UNLOCK_M;
-    const cls = 'pin' + (isDone ? ' done' : '') + (hinted ? '' : ' hidden') + (near ? ' near' : '');
-    const html = `<div class="${cls}">${hinted ? q.ic : '?'}</div>`;
-    const icon = L.divIcon({ html, className:'', iconSize:[34,34], iconAnchor:[17,17] });
-    if (markers[q.id]) markers[q.id].setIcon(icon);
-    else markers[q.id] = L.marker([q.lat, q.lng], { icon }).addTo(map).on('click', () => openQuest(q.id));
+  for(const p of places()){
+    const icon=L.divIcon({html:pinHtml(p),className:'',iconSize:[38,38],iconAnchor:[19,19]});
+    if(markers[p.id]) markers[p.id].setIcon(icon);
+    else markers[p.id]=L.marker([p.lat,p.lng],{icon,riseOnHover:true}).addTo(map).on('click',()=>openPlace(p.id));
   }
-  for (const id in markers) if (!allQuests().find(q => q.id === id)) { map.removeLayer(markers[id]); delete markers[id]; }
+  for(const id in markers) if(!placeById(id)){ map.removeLayer(markers[id]); delete markers[id]; }
 }
 
-// ---------- HUD ----------
+/* ================= Teasers (Wikipedia / Wikimedia Commons) ================= */
+const loading={};
+async function fetchTeaser(p,force){
+  if(!force&&teasers[p.id]) return teasers[p.id];
+  if(loading[p.id]) return loading[p.id];
+  const q=p.q||(p.name+' Damascus');
+  const words=(p.custom?p.name:p.q||p.name).toLowerCase().split(/[^a-z\u0600-\u06ff0-9]+/).filter(w=>w.length>=4&&w!=='damascus');
+  const rel=t=>!p.custom||!words.length||words.some(w=>String(t||'').toLowerCase().includes(w));
+  loading[p.id]=(async()=>{
+    const out={photos:[],extract:'',url:''};
+    try{
+      const u='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|mime&iiurlwidth=800&gsrsearch='+encodeURIComponent(q);
+      const j=await (await fetch(u)).json();
+      const pages=Object.values((j.query&&j.query.pages)||{}).sort((a,b)=>a.index-b.index);
+      for(const pg of pages){ const ii=pg.imageinfo&&pg.imageinfo[0]; if(ii&&/jpeg|png|webp/.test(ii.mime)&&ii.thumburl&&rel(pg.title)) out.photos.push(ii.thumburl); if(out.photos.length>=5) break; }
+    }catch(e){}
+    try{
+      const u='https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=1&prop=extracts|pageimages|info&inprop=url&exintro=1&explaintext=1&exsentences=4&piprop=thumbnail&pithumbsize=800&gsrsearch='+encodeURIComponent(q);
+      const j=await (await fetch(u)).json();
+      const pg=Object.values((j.query&&j.query.pages)||{})[0];
+      if(pg&&rel(pg.title)){ out.extract=pg.extract||''; out.url=pg.fullurl||''; if(pg.thumbnail&&pg.thumbnail.source&&!out.photos.includes(pg.thumbnail.source)) out.photos.unshift(pg.thumbnail.source); }
+    }catch(e){}
+    if(out.photos.length||out.extract){ teasers[p.id]=out; LS.set('ud_teasers',teasers); }
+    delete loading[p.id];
+    return teasers[p.id]||out;
+  })();
+  return loading[p.id];
+}
+async function warmTeasers(){
+  for(const p of places()){ if(!teasers[p.id]){ await fetchTeaser(p); if(markers[p.id]) markers[p.id].setIcon(L.divIcon({html:pinHtml(p),className:'',iconSize:[38,38],iconAnchor:[19,19]})); } }
+}
+
+/* ================= HUD ================= */
+let prevLv=levelInfo(totalXp()).lv;
 function renderHud(){
-  const xp = totalXp(), L1 = levelInfo(xp);
-  document.getElementById('lvlTitle').textContent = `Lv ${L1.lv} · ${L1.title}`;
-  const km2 = (cells.size * 15 * 15 / 1e6).toFixed(2);
-  document.getElementById('lvlSub').textContent = `${xp} XP · ${Object.keys(done).length}/${allQuests().length} quests · ${km2} km² unfogged`;
-  document.querySelector('#bar > div').style.width = Math.round(L1.into / L1.need * 100) + '%';
+  const xp=totalXp(), li=levelInfo(xp);
+  $('lvlTitle').textContent=`Lv ${li.lv} · ${li.title}`;
+  $('lvlSub').textContent=`${xp} XP · ${Object.keys(visits).length}/${places().length} places · ${fmtD(totalDist())} walked`;
+  document.querySelector('#bar>div').style.width=Math.round(li.into/li.need*100)+'%';
+  if(li.lv>prevLv){ prevLv=li.lv; vibrate([80,60,80]); toast(`⬆️ Level ${li.lv}: ${li.title}!`); }
 }
-let prevLevel = levelInfo(totalXp()).lv;
-function checkLevelUp(){
-  const lv = levelInfo(totalXp()).lv;
-  if (lv > prevLevel) { prevLevel = lv; vibrate([80,60,80]); toast(`⬆️ Level ${lv}: ${TITLES[Math.min(lv-1, TITLES.length-1)]}!`); }
-}
+function setGps(state,txt){ $('gpsDot').style.background=state==='ok'?'#5fd38d':state==='wait'?'#f2c66d':state==='err'?'#ff6b6b':'#667'; $('gpsTxt').textContent=txt; }
 
-// ---------- GPS / walking ----------
-let watchId = null, meMarker = null, accCircle = null, wakeLock = null, follow = true, lastFix = null;
-const btnWalk = document.getElementById('btnWalk');
-function setGps(state, txt){ document.getElementById('gpsDot').style.background = state === 'ok' ? '#5fd38d' : state === 'wait' ? '#e6c36a' : state === 'err' ? '#ff6b6b' : '#666'; document.getElementById('gpsTxt').textContent = txt; }
-function reveal(lat, lng){
-  let added = 0;
-  const steps = Math.ceil(REVEAL_M / 15);
-  for (let i = -steps; i <= steps; i++) for (let j = -steps; j <= steps; j++) {
-    const a = lat + i * CELL, o = lng + j * CELL;
-    if (dist(lat, lng, a, o) > REVEAL_M * 0.6) continue;
-    const k = key(a, o); if (!cells.has(k)) { cells.add(k); added++; }
-  }
-  return added;
-}
+/* ================= Walking ================= */
+let watchId=null, me=null, acc=null, wake=null, follow=true, cur=LS.get('ud_curwalk',null), lastFix=null, liveT=null;
+if(cur){ if(cur.pts&&cur.pts.length>1) walks.push(finalize(cur)); cur=null; LS.set('ud_walks',walks); LS.set('ud_curwalk',null); }
+function finalize(w){ w.end=w.end||w.last||Date.now(); delete w.last; return w; }
+function reveal(lat,lng){ let n=0; const s=Math.ceil(REVEAL_M/15); for(let i=-s;i<=s;i++) for(let j=-s;j<=s;j++){ const a=lat+i*CELL,o=lng+j*CELL; if(dist(lat,lng,a,o)>REVEAL_M*.6) continue; const k=key(a,o); if(!cells.has(k)){cells.add(k);n++;} } return n; }
+const saveCur=debounce(()=>LS.set('ud_curwalk',cur),3000);
 function onFix(pos){
-  const { latitude:lat, longitude:lng, accuracy:acc } = pos.coords;
-  if (acc > MAX_ACC) { setGps('wait', `±${Math.round(acc)}m…`); return; }
-  setGps('ok', `±${Math.round(acc)}m`);
-  let added = 0;
-  if (lastFix) {
-    const d = dist(lastFix[0], lastFix[1], lat, lng);
-    if (d < 400) { // fill the path between fixes
-      const n = Math.ceil(d / 10);
-      for (let s = 1; s <= n; s++) added += reveal(lastFix[0] + (lat - lastFix[0]) * s / n, lastFix[1] + (lng - lastFix[1]) * s / n);
-    } else added += reveal(lat, lng);
-  } else added += reveal(lat, lng);
-  lastFix = [lat, lng]; lastPos = [lat, lng];
-  if (!meMarker) {
-    meMarker = L.marker([lat, lng], { icon: L.divIcon({ html:'<div class="me"></div>', className:'', iconSize:[18,18], iconAnchor:[9,9] }), zIndexOffset:1000 }).addTo(map);
-    accCircle = L.circle([lat, lng], { radius:acc, color:'#4ea3ff', weight:1, fillOpacity:.06 }).addTo(map);
-  } else { meMarker.setLatLng([lat, lng]); accCircle.setLatLng([lat, lng]).setRadius(acc); }
-  if (follow) map.panTo([lat, lng], { animate:false });
-  if (added) { saveCells(); drawFog(); renderHud(); checkLevelUp(); }
-  renderMarkers();
-  // nearby quest nudge
-  for (const q of allQuests()) {
-    if (done[q.id] || q._nudged) continue;
-    if (dist(lat, lng, q.lat, q.lng) <= UNLOCK_M) { q._nudged = true; vibrate(200); toast(`${q.ic} ${q.name} is right here. Tap it to unlock!`); }
+  const {latitude:lat,longitude:lng,accuracy:ac}=pos.coords;
+  if(ac>MAX_ACC){ setGps('wait',`±${Math.round(ac)} m…`); return; }
+  setGps('ok',`±${Math.round(ac)} m`);
+  let added=0;
+  if(lastFix){ const d=dist(lastFix[0],lastFix[1],lat,lng);
+    if(d<400){ const n=Math.max(1,Math.ceil(d/10)); for(let s=1;s<=n;s++) added+=reveal(lastFix[0]+(lat-lastFix[0])*s/n,lastFix[1]+(lng-lastFix[1])*s/n); }
+    else added+=reveal(lat,lng);
+  } else added+=reveal(lat,lng);
+  // trail
+  if(cur){
+    const lp=cur.pts[cur.pts.length-1];
+    const d=lp?dist(lp[0],lp[1],lat,lng):Infinity;
+    if(!lp||d>=MIN_STEP){
+      if(lp&&d<400) cur.dist+=d;
+      cur.pts.push([+lat.toFixed(5),+lng.toFixed(5)]); cur.last=Date.now();
+      if(settings.trails){ if(liveLine){ liveLine.addLatLng([lat,lng]); liveGlow.addLatLng([lat,lng]); } else if(cur.pts.length>1) drawTrails(); }
+      saveCur();
+    }
   }
+  lastFix=[lat,lng]; lastPos=[lat,lng];
+  if(!me){ me=L.marker([lat,lng],{icon:L.divIcon({html:'<div class="me"></div>',className:'',iconSize:[20,20],iconAnchor:[10,10]}),zIndexOffset:2000}).addTo(map); acc=L.circle([lat,lng],{radius:ac,color:'#4ea3ff',weight:1,fillOpacity:.07,interactive:false}).addTo(map); }
+  else { me.setLatLng([lat,lng]); acc.setLatLng([lat,lng]).setRadius(ac); }
+  if(follow) map.panTo([lat,lng],{animate:false});
+  if(added){ saveCells(); drawFog(); }
+  renderHud(); renderMarkers(); renderLive();
+  for(const p of places()){ if(visits[p.id]||p._nudged) continue; if(dist(lat,lng,p.lat,p.lng)<=NEAR_M){ p._nudged=true; vibrate(200); toast(`${CATS[p.cat].ic} You're at ${p.name}. Tap it to start the shot list!`); } }
 }
-function onErr(e){
-  if (e.code === 1) { setGps('err', 'Denied'); toast('Location permission denied. Enable it in browser settings.'); stopWalk(); }
-  else setGps('wait', 'Searching…');
-}
+function onErr(e){ if(e.code===1){ setGps('err','Denied'); toast('Location permission denied. Enable it in Chrome settings.'); stopWalk(true); } else setGps('wait','Searching…'); }
+function renderLive(){ if(!cur){ $('live').classList.remove('show'); return; } $('live').classList.add('show'); $('live').textContent=`🚶 ${fmtD(cur.dist)} · ${fmtT(Date.now()-cur.start)} · +${cells.size-cur.cells0} tiles`; }
 async function startWalk(){
-  if (!('geolocation' in navigator)) { toast('This browser has no GPS access'); return; }
-  if (!window.isSecureContext) { toast('GPS needs an https:// address. See the setup notes.'); return; }
-  setGps('wait', 'Searching…'); follow = true; lastFix = null;
-  watchId = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy:true, maximumAge:2000, timeout:20000 });
-  btnWalk.textContent = '■ Stop walk'; btnWalk.classList.remove('primary'); btnWalk.classList.add('walking');
-  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
-  toast('Walk started. Keep the app open while you explore.');
+  if(!('geolocation' in navigator)){ toast('No GPS in this browser'); return; }
+  if(!window.isSecureContext){ toast('GPS needs an https:// link'); return; }
+  cur={ id:'w'+Date.now(), start:Date.now(), pts:[], dist:0, cells0:cells.size, xp0:totalXp(), visits0:Object.keys(visits).length, shots0:Object.keys(shots).length };
+  follow=true; lastFix=null; setGps('wait','Searching…');
+  watchId=navigator.geolocation.watchPosition(onFix,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  $('walkBtn').textContent='■ End walk'; $('walkBtn').classList.add('on');
+  try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
+  clearInterval(liveT); liveT=setInterval(renderLive,15000); renderLive();
+  toast('Walk started. Keep the app open. 🌙 Dim your screen to save battery.');
 }
-function stopWalk(){
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null;
-  btnWalk.textContent = '▶ Start walk'; btnWalk.classList.add('primary'); btnWalk.classList.remove('walking');
-  try { wakeLock && wakeLock.release(); } catch(e){} wakeLock = null;
-  if (document.getElementById('gpsTxt').textContent !== 'Denied') setGps('off', 'GPS off');
-  LS.set('ud_cells', [...cells]);
+function stopWalk(silent){
+  if(watchId!==null) navigator.geolocation.clearWatch(watchId); watchId=null;
+  try{ wake&&wake.release(); }catch(e){} wake=null; clearInterval(liveT);
+  $('walkBtn').textContent='▶ Start walk'; $('walkBtn').classList.remove('on');
+  if($('gpsTxt').textContent!=='Denied') setGps('off','GPS off');
+  LS.set('ud_cells',[...cells]);
+  const w=cur; cur=null; LS.set('ud_curwalk',null); renderLive();
+  if(w&&w.pts.length>1){ w.end=Date.now(); delete w.last; walks.push(w); LS.set('ud_walks',walks); drawTrails(); if(!silent) showSummary(w); }
+  else { drawTrails(); if(!silent&&w) toast('Walk too short to save. Try a longer one!'); }
 }
-btnWalk.onclick = () => watchId === null ? startWalk() : stopWalk();
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && watchId !== null && !wakeLock) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
-  if (document.visibilityState === 'hidden') LS.set('ud_cells', [...cells]);
-});
-map.on('dragstart', () => { follow = false; });
+$('walkBtn').onclick=()=>watchId===null?startWalk():stopWalk();
+document.addEventListener('visibilitychange',async()=>{ if(document.visibilityState==='visible'&&watchId!==null&&!wake){ try{ wake=await navigator.wakeLock.request('screen'); }catch(e){} } if(document.visibilityState==='hidden'){ LS.set('ud_cells',[...cells]); if(cur) LS.set('ud_curwalk',cur);} });
+map.on('dragstart',()=>{follow=false;});
 
-// ---------- Sheets ----------
-const sheet = document.getElementById('sheet'), scrim = document.getElementById('scrim');
-function openSheet(html){ sheet.innerHTML = html; sheet.classList.add('open'); scrim.classList.add('open'); sheet.scrollTop = 0; }
+function showSummary(w){
+  const newTiles=cells.size-w.cells0, xp=totalXp()-w.xp0, nv=Object.keys(visits).length-w.visits0, ns=Object.keys(shots).length-w.shots0;
+  follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]});
+  openSheet(`<div class="grab"></div><div class="sh">
+    <h2>🏁 Walk complete</h2>
+    <p style="color:var(--muted);margin:2px 0 0">${new Date(w.start).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</p>
+    <div class="sumgrid">
+      <div><b>${fmtD(w.dist)}</b><span>distance</span></div>
+      <div><b>${fmtT(w.end-w.start)}</b><span>time</span></div>
+      <div><b>+${xp}</b><span>XP</span></div>
+      <div><b>${newTiles}</b><span>new tiles</span></div>
+      <div><b>${nv}</b><span>places</span></div>
+      <div><b>${ns}</b><span>shots</span></div>
+    </div>
+    <p>${newTiles>20?'You uncovered a real chunk of the city today.':'Every street counts. Next time, take a turn you never take.'}</p>
+    <div class="row"><button class="btn pri" data-a="close">Nice</button></div></div>`);
+}
+
+/* ================= Sheets ================= */
+const sheet=$('sheet'), scrim=$('scrim');
+function openSheet(h){ sheet.innerHTML=h; sheet.classList.add('open'); scrim.classList.add('open'); sheet.scrollTop=0; }
 function closeSheet(){ sheet.classList.remove('open'); scrim.classList.remove('open'); }
-scrim.onclick = closeSheet;
+scrim.onclick=closeSheet;
 
-async function openQuest(id){
-  const q = allQuests().find(x => x.id === id); if (!q) return;
-  const hinted = isHinted(q);
-  if (!hinted) {
-    openSheet(`<h2>? Undiscovered</h2><p>Something is hidden in the fog here. Walk closer to reveal what it is.</p><div class="row"><button class="btn" data-a="close">OK</button></div>`);
-    return;
-  }
-  const d = lastPos ? dist(lastPos[0], lastPos[1], q.lat, q.lng) : null;
-  const canUnlock = d !== null && d <= UNLOCK_M;
-  const photo = done[q.id] ? await getPhoto(q.id) : null;
-  const when = done[q.id] ? new Date(done[q.id]).toLocaleDateString() : '';
-  openSheet(`
-    <h2>${q.ic} ${esc(q.name)}</h2>
-    ${q.ar ? `<div class="ar">${esc(q.ar)}</div>` : ''}
-    <p>${esc(q.task || '')}</p>
-    <p style="color:var(--muted);font-size:12px">${q.kind === 'selfie' ? '🤳 Selfie quest' : '📷 Photo quest'} · +${XP_QUEST} XP ${d !== null ? '· ' + (d < 1000 ? Math.round(d) + ' m away' : (d/1000).toFixed(1) + ' km away') : '· start a walk to measure distance'}</p>
-    ${done[q.id] ? `<p style="color:var(--ok)">✅ Unlocked on ${when}</p>` : ''}
-    ${photo ? `<img class="ph" src="${photo}">` : ''}
-    <div class="row">
-      ${done[q.id]
-        ? `<button class="btn" data-a="retake" data-id="${q.id}">Replace photo</button>`
-        : `<button class="btn primary" data-a="unlock" data-id="${q.id}" ${canUnlock ? '' : 'disabled'}>${canUnlock ? (q.kind === 'selfie' ? '🤳 Take selfie' : '📷 Take photo') : '🔒 Get within ' + UNLOCK_M + ' m'}</button>`}
-      <button class="btn" data-a="close">Close</button>
-    </div>
-    ${q.custom ? `<div class="row"><button class="btn" data-a="delcustom" data-id="${q.id}" style="color:#ff8a8a">Delete this spot</button></div>` : ''}
-  `);
+async function openPlace(id){
+  const p=placeById(id); if(!p) return;
+  const c=CATS[p.cat];
+  const d=lastPos?dist(lastPos[0],lastPos[1],p.lat,p.lng):null;
+  const near=d!==null&&d<=NEAR_M;
+  const t=teasers[p.id];
+  const photos=t&&t.photos||[];
+  const mine=await Promise.all(p.shots.map((_,i)=>shots[p.id+'#'+i]?getPhoto(p.id+'#'+i):null));
+  const done=shotsDone(p);
+  const bio=p.bio||(t&&t.extract)||'';
+  openSheet(`<div class="grab"></div>
+    ${photos.length?`<div class="carousel">${photos.map(u=>`<img src="${esc(u)}" loading="lazy" referrerpolicy="no-referrer">`).join('')}</div>`
+      :`<div class="hero" style="background:linear-gradient(135deg,${c.c}33,#1d2742)">${c.ic}</div>`}
+    <div class="sh">
+      <h2>${esc(p.name)}</h2>${p.ar?`<div class="ar">${esc(p.ar)}</div>`:''}
+      <div class="badges">
+        <span class="badge" style="border-color:${c.c}66">${c.ic} ${c.n}</span>
+        <span class="badge">${TIMES[p.time||'any']}</span>
+        <span class="badge">${d!==null?'📏 '+fmtD(d):'📏 start a walk'}</span>
+        ${visits[p.id]?'<span class="badge" style="color:var(--ok)">✓ Visited</span>':''}
+      </div>
+      ${bio?`<p>${esc(bio)}</p>`:`<p style="color:var(--muted)" id="bioLoad">Looking up this place…</p>`}
+      ${t&&t.url?`<a class="lnk" href="${esc(t.url)}" target="_blank" rel="noopener">Read more on Wikipedia →</a>`:''}
+      <div class="sec" style="margin-top:14px">📸 Shot list <span style="color:var(--muted);font-weight:600;font-size:12px">${done}/${p.shots.length}</span></div>
+      ${p.shots.map((s,i)=>`<div class="shot ${shots[p.id+'#'+i]?'done':''}">
+        <div class="ck">${shots[p.id+'#'+i]?'✓':i+1}</div>
+        <div class="t">${esc(s)}</div>
+        ${mine[i]?`<img src="${mine[i]}" data-a="view" data-k="${esc(p.id+'#'+i)}">`:''}
+        <button data-a="shoot" data-id="${esc(p.id)}" data-i="${i}" ${near?'':'disabled'}>${mine[i]?'Retake':(p.selfie&&i===0?'🤳':'📷')}</button>
+      </div>`).join('')}
+      ${!near?`<p style="font-size:12px;color:var(--muted)">🔒 Get within ${NEAR_M} m to take the shots.</p>`:''}
+      ${p.tip?`<div class="tip">💡 ${esc(p.tip)}</div>`:''}
+      <div class="row">
+        <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking" target="_blank" rel="noopener">🧭 Directions</a>
+        <button class="btn" data-a="close">Close</button>
+      </div>
+      ${p.custom?`<div class="row"><button class="btn" data-a="editplace" data-id="${esc(p.id)}">✏️ Edit</button><button class="btn danger" data-a="delplace" data-id="${esc(p.id)}">Delete</button></div>`:''}
+    </div>`);
+  if(!t){ const nt=await fetchTeaser(p); if(sheet.classList.contains('open')&&(nt.photos.length||nt.extract)) { renderMarkers(); openPlace(id); } else { const b=$('bioLoad'); if(b) b.textContent='No info found online. Add your own story by exploring it.'; } }
 }
 
-let pendingQuest = null;
-function takePhoto(q){
-  pendingQuest = q;
-  document.getElementById(q.kind === 'selfie' ? 'fileUser' : 'fileEnv').click();
-}
-async function compress(file){
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const max = 1280, s = Math.min(1, max / Math.max(img.width, img.height));
-    const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.8);
-  } finally { URL.revokeObjectURL(url); }
-}
+/* ---- photos ---- */
+let pending=null;
+function shoot(p,i){ pending={p,i}; $((p.selfie&&i===0)?'fileUser':'fileEnv').click(); }
+async function compress(file){ const u=URL.createObjectURL(file); try{ const img=await new Promise((res,rej)=>{const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=u;}); const s=Math.min(1,1400/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.82); } finally{ URL.revokeObjectURL(u); } }
 async function onPhoto(e){
-  const f = e.target.files && e.target.files[0]; e.target.value = '';
-  if (!f || !pendingQuest) return;
-  const q = pendingQuest; pendingQuest = null;
-  try {
-    const data = await compress(f);
-    await putPhoto(q.id, data);
-    const first = !done[q.id];
-    done[q.id] = done[q.id] || Date.now(); LS.set('ud_done', done);
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f||!pending) return;
+  const {p,i}=pending; pending=null; const k=p.id+'#'+i;
+  try{
+    await putPhoto(k,await compress(f));
+    const firstVisit=!visits[p.id], firstShot=!shots[k];
+    shots[k]=shots[k]||Date.now(); LS.set('ud_shots',shots);
+    if(firstVisit){ visits[p.id]=Date.now(); LS.set('ud_visits',visits); }
     renderMarkers(); renderHud();
-    if (first) { vibrate([100,50,100,50,200]); toast(`🏆 ${q.name} unlocked! +${XP_QUEST} XP`); checkLevelUp(); }
-    openQuest(q.id);
-  } catch(err){ toast('Could not read that photo'); }
+    if(firstVisit){ vibrate([100,50,100,50,200]); toast(`🏆 ${p.name} unlocked! +${XP.visit+XP.shot} XP`); }
+    else if(firstShot){ vibrate(120); toast(shotsDone(p)===p.shots.length?`🌟 Shot list complete! +${XP.shot+XP.full} XP`:`📸 +${XP.shot} XP`); }
+    openPlace(p.id);
+  }catch(err){ toast('Could not read that photo'); }
 }
-document.getElementById('fileEnv').onchange = onPhoto;
-document.getElementById('fileUser').onchange = onPhoto;
+$('fileEnv').onchange=onPhoto; $('fileUser').onchange=onPhoto;
 
-function openQuests(){
-  const here = lastPos;
-  const qs = allQuests().map(q => ({ q, d: here ? dist(here[0], here[1], q.lat, q.lng) : null }))
-    .sort((a, b) => (!!done[a.q.id] - !!done[b.q.id]) || ((a.d ?? 1e9) - (b.d ?? 1e9)));
-  openSheet(`<h2>Quests</h2><p style="color:var(--muted);font-size:13px;margin-top:0">Hidden ones show as ? until you explore near them.</p>` +
-    qs.map(({ q, d }) => {
-      const h = isHinted(q);
-      return `<div class="list-item" data-a="goto" data-id="${q.id}">
-        <div class="ic">${done[q.id] ? '✅' : h ? q.ic : '❔'}</div>
-        <div class="nm">${h ? esc(q.name) : 'Undiscovered'}<small>${h && q.ar ? esc(q.ar) + ' · ' : ''}${d !== null ? (d < 1000 ? Math.round(d) + ' m' : (d/1000).toFixed(1) + ' km') : ''}</small></div>
-      </div>`;
-    }).join('') + `<div class="row"><button class="btn" data-a="close">Close</button></div>`);
+/* ---- viewer ---- */
+let vList=[], vIdx=0;
+async function openViewer(list,idx){ vList=list; vIdx=idx; await showV(); $('viewer').classList.add('open'); }
+async function showV(){
+  const k=vList[vIdx], [pid,i]=k.split('#'), p=placeById(pid), src=await getPhoto(k);
+  $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${esc(p?p.name:'')}</b><small>${esc(p?p.shots[+i]||'':'')} · ${shots[k]?new Date(shots[k]).toLocaleDateString():''}</small></div>
+   <div class="vnav"><button class="btn" data-v="-1" ${vIdx?'':'disabled'}>‹</button><button class="btn" data-v="x">Close</button><button class="btn" data-v="1" ${vIdx<vList.length-1?'':'disabled'}>›</button></div>`;
+}
+$('viewer').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; if(b.dataset.v==='x') $('viewer').classList.remove('open'); else { vIdx=Math.max(0,Math.min(vList.length-1,vIdx+ +b.dataset.v)); showV(); } };
+
+/* ---- add / edit custom place ---- */
+let draft=null;
+function placeForm(title){
+  const segC=Object.entries(CATS).map(([k,c])=>`<button data-a="dcat" data-v="${k}" class="${draft.cat===k?'act':''}">${c.ic} ${c.n}</button>`).join('');
+  const segT=Object.entries(TIMES).map(([k,v])=>`<button data-a="dtime" data-v="${k}" class="${draft.time===k?'act':''}">${v}</button>`).join('');
+  openSheet(`<div class="grab"></div><div class="sh">
+    <h2>${title}</h2>
+    <label class="f">Name</label><input class="f" id="dName" value="${esc(draft.name)}" placeholder="e.g. Al-Nawfara Café" maxlength="60">
+    <label class="f">What kind of place?</label><div class="seg">${segC}</div>
+    <label class="f">Best time</label><div class="seg">${segT}</div>
+    <label class="f">Shot list (up to 3, optional)</label>
+    <input class="f" id="dS0" value="${esc(draft.shots[0]||'')}" placeholder="One photo that captures it" style="margin-bottom:6px">
+    <input class="f" id="dS1" value="${esc(draft.shots[1]||'')}" placeholder="A detail most people miss" style="margin-bottom:6px">
+    <input class="f" id="dS2" value="${esc(draft.shots[2]||'')}" placeholder="A selfie there">
+    <label class="f">Your note / tip (optional)</label><input class="f" id="dTip" value="${esc(draft.tip||'')}" maxlength="140">
+    <div class="row"><button class="btn pri" data-a="dsave">Save place</button><button class="btn" data-a="close">Cancel</button></div>
+    <p style="font-size:12px;color:var(--muted)">Photos and history are looked up online by the name.</p>
+  </div>`);
+}
+function readDraft(){ draft.name=$('dName').value.trim(); draft.shots=['dS0','dS1','dS2'].map(i=>$(i).value.trim()).filter(Boolean); draft.tip=$('dTip').value.trim(); }
+function addPlaceAt(lat,lng){ draft={ id:'c'+Date.now(), custom:true, cat:'mine', time:'any', name:'', shots:[], tip:'', lat:+lat.toFixed(6), lng:+lng.toFixed(6) }; placeForm('➕ New place'); }
+map.on('contextmenu',e=>addPlaceAt(e.latlng.lat,e.latlng.lng));
+
+/* ---- sheet actions ---- */
+sheet.addEventListener('click',async e=>{
+  const el=e.target.closest('[data-a]'); if(!el) return; const a=el.dataset.a;
+  if(a==='close') closeSheet();
+  else if(a==='shoot'){ const p=placeById(el.dataset.id); p&&shoot(p,+el.dataset.i); }
+  else if(a==='view'){ const keys=Object.keys(shots).filter(k=>k.startsWith(el.dataset.k.split('#')[0]+'#')).sort(); openViewer(keys,Math.max(0,keys.indexOf(el.dataset.k))); }
+  else if(a==='dcat'){ readDraft(); draft.cat=el.dataset.v; placeForm(draft._edit?'✏️ Edit place':'➕ New place'); }
+  else if(a==='dtime'){ readDraft(); draft.time=el.dataset.v; placeForm(draft._edit?'✏️ Edit place':'➕ New place'); }
+  else if(a==='dsave'){
+    readDraft(); if(!draft.name){ toast('Give it a name'); return; }
+    if(!draft.shots.length) draft.shots=['One photo that captures it'];
+    draft.q=draft.name+' Damascus';
+    const isEdit=draft._edit; delete draft._edit;
+    if(isEdit){ const i=custom.findIndex(x=>x.id===draft.id); if(i>=0){ const old=custom[i]; if(old.name!==draft.name) delete teasers[draft.id]; custom[i]=draft; } }
+    else custom.push(draft);
+    LS.set('ud_custom2',custom); LS.set('ud_teasers',teasers);
+    const id=draft.id; draft=null; renderMarkers(); renderHud(); toast(isEdit?'Saved':'⭐ Place added'); openPlace(id);
+  }
+  else if(a==='editplace'){ draft=JSON.parse(JSON.stringify(placeById(el.dataset.id))); draft._edit=true; placeForm('✏️ Edit place'); }
+  else if(a==='delplace'){
+    if(!el.dataset.c){ el.dataset.c=1; el.textContent='Tap again to delete'; return; }
+    const id=el.dataset.id; custom=custom.filter(x=>x.id!==id); delete visits[id]; delete teasers[id];
+    for(const k of Object.keys(shots)) if(k.startsWith(id+'#')){ delete shots[k]; delPhoto(k); }
+    LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_teasers',teasers);
+    renderMarkers(); renderHud(); closeSheet(); toast('Place deleted');
+  }
+  else if(a==='walkview'){ const w=walks.find(x=>x.id===el.dataset.id); if(w){ closeSheet(); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]}); } }
+});
+
+/* ================= Pages ================= */
+let curPage='map', placeFilter='all';
+function go(pg){
+  curPage=pg; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('act',b.dataset.go===pg));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('show',p.id==='pg-'+pg));
+  if(pg==='places') renderPlaces(); if(pg==='gallery') renderGallery(); if(pg==='stats') renderStats();
+  if(pg==='map') setTimeout(()=>{ map.invalidateSize(); drawFog(); },50);
+}
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
+
+function renderPlaces(){
+  const f=[['all','All'],['todo','To visit'],['done','Visited'],['day','☀️ Day'],['night','🌙 Night']].concat(Object.entries(CATS).map(([k,c])=>[k,c.ic+' '+c.n]));
+  $('placeFilters').innerHTML=f.map(([k,n])=>`<button class="chip ${placeFilter===k?'act':''}" data-f="${k}">${n}</button>`).join('');
+  let list=places().map(p=>({p,d:lastPos?dist(lastPos[0],lastPos[1],p.lat,p.lng):null}));
+  list=list.filter(({p})=> placeFilter==='all'||(placeFilter==='todo'&&!visits[p.id])||(placeFilter==='done'&&visits[p.id])||(placeFilter==='day'&&(p.time==='day'||p.time==='any'))||(placeFilter==='night'&&(p.time==='night'||p.time==='sunset'||p.time==='any'))||p.cat===placeFilter);
+  list.sort((a,b)=>(!!visits[a.p.id]-!!visits[b.p.id])||((a.d??1e9)-(b.d??1e9)));
+  $('placeList').innerHTML=list.length?list.map(({p,d})=>{ const t=teasers[p.id],img=t&&t.photos&&t.photos[0],c=CATS[p.cat],sd=shotsDone(p);
+    return `<div class="pcard" data-p="${esc(p.id)}"><div class="th" style="${img?`background-image:url('${esc(img)}')`:`background:linear-gradient(135deg,${c.c}44,#25304d)`}">${img?'':c.ic}${visits[p.id]?'<span class="ok">✓</span>':''}</div>
+      <div class="tx"><div class="nm">${esc(p.name)}</div><div class="ar">${esc(p.ar||c.n)}</div>
+      <div class="meta">${TIMES[p.time||'any']}${d!==null?' · '+fmtD(d):''} · 📸 ${sd}/${p.shots.length}</div>
+      <div class="prog"><div style="width:${p.shots.length?sd/p.shots.length*100:0}%"></div></div></div></div>`; }).join('')
+    :`<div class="empty"><b>🧭</b>Nothing here yet.</div>`;
+}
+$('placeFilters').addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(b){ placeFilter=b.dataset.f; renderPlaces(); } });
+$('placeList').addEventListener('click',e=>{ const c=e.target.closest('[data-p]'); if(!c) return; const p=placeById(c.dataset.p); go('map'); follow=false; map.setView([p.lat,p.lng],17); setTimeout(()=>openPlace(p.id),120); });
+
+async function renderGallery(){
+  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]);
+  if(!keys.length){ $('galBody').innerHTML=`<div class="empty"><b>📷</b>No photos yet.<br>Visit a place and work through its shot list.</div>`; return; }
+  const photos=await allPhotos(); const by={};
+  for(const k of keys){ const pid=k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
+  $('galBody').innerHTML=Object.entries(by).map(([pid,ks])=>{ const p=placeById(pid); return `<div class="galhead">${esc(p?p.name:'Removed place')} · ${ks.length}</div><div class="gal">${ks.map(k=>photos[k]?`<img src="${photos[k]}" data-k="${esc(k)}">`:'').join('')}</div>`; }).join('');
+  $('galBody').onclick=e=>{ const im=e.target.closest('img[data-k]'); if(im) openViewer(keys,keys.indexOf(im.dataset.k)); };
 }
 
-async function openMenu(){
-  const photos = await allPhotos();
-  const ids = Object.keys(photos);
-  const L1 = levelInfo(totalXp());
-  openSheet(`
-    <h2>Your Damascus</h2>
-    <div class="stat"><span>Level</span><b>${L1.lv} · ${L1.title}</b></div>
-    <div class="stat"><span>Total XP</span><b>${totalXp()}</b></div>
-    <div class="stat"><span>Area unfogged</span><b>${(cells.size * 225 / 1e6).toFixed(2)} km²</b></div>
-    <div class="stat"><span>Quests done</span><b>${Object.keys(done).length} / ${allQuests().length}</b></div>
-    <div class="stat"><span>Your own spots</span><b>${custom.length}</b></div>
-    <div class="row">
-      <button class="btn primary" data-a="addspot">➕ Add a spot here</button>
-      <button class="btn" data-a="locate">📍 Center on me</button>
+function renderStats(){
+  const ps=places(), v=Object.keys(visits).length, pct=ps.length?v/ps.length:0;
+  const totalShots=ps.reduce((s,p)=>s+p.shots.length,0), sh=Object.keys(shots).length;
+  const li=levelInfo(totalXp()); const R=34,C=2*Math.PI*R;
+  const ms=walks.reduce((s,w)=>s+(w.end-w.start),0), longest=walks.reduce((m,w)=>Math.max(m,w.dist||0),0);
+  const days=new Set(walks.map(w=>new Date(w.start).toDateString())).size;
+  $('statsLead').textContent=`Level ${li.lv} · ${li.title} · ${totalXp()} XP (${li.need-li.into} to next level)`;
+  const cats=Object.entries(CATS).map(([k,c])=>{ const all=ps.filter(p=>p.cat===k); if(!all.length) return ''; const d=all.filter(p=>visits[p.id]).length;
+    return `<div class="catrow"><span style="width:92px">${c.ic} ${c.n}</span><div class="cb"><div style="width:${d/all.length*100}%;background:${c.c}"></div></div><span style="width:34px;text-align:right">${d}/${all.length}</span></div>`; }).join('');
+  $('statsBody').innerHTML=`
+    <div class="ring"><svg width="84" height="84" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${R}" fill="none" stroke="#26304b" stroke-width="9"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="#f2c66d" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 42 42)"/></svg>
+      <div><div class="big">${v} / ${ps.length}</div><div style="font-size:13px;color:var(--muted)">places visited · ${Math.round(pct*100)}%</div><div style="font-size:13px;margin-top:4px">${ps.length-v} still waiting for you</div></div></div>
+    <div class="grid2">
+      <div class="tile"><div class="v">${fmtD(totalDist())}</div><div class="k">walked</div></div>
+      <div class="tile"><div class="v">${(cells.size*225/1e6).toFixed(2)} km²</div><div class="k">unfogged</div></div>
+      <div class="tile"><div class="v">${sh} / ${totalShots}</div><div class="k">shots taken</div></div>
+      <div class="tile"><div class="v">${walks.length}</div><div class="k">walks · ${days} day${days===1?'':'s'}</div></div>
+      <div class="tile"><div class="v">${fmtT(ms)}</div><div class="k">time exploring</div></div>
+      <div class="tile"><div class="v">${fmtD(longest)}</div><div class="k">longest walk</div></div>
     </div>
-    <h2 style="margin-top:18px;font-size:16px">Album</h2>
-    ${ids.length ? `<div class="grid">${ids.map(i => `<img src="${photos[i]}" data-a="goto" data-id="${esc(i)}">`).join('')}</div>` : `<p style="color:var(--muted)">No photos yet. Unlock a quest to start your album.</p>`}
-    <h2 style="margin-top:18px;font-size:16px">Backup</h2>
-    <p style="color:var(--muted);font-size:13px">Everything lives only on this phone. Export a backup now and then so you never lose your map.</p>
-    <div class="row">
-      <button class="btn" data-a="export">⬇️ Export</button>
-      <button class="btn" data-a="import">⬆️ Import</button>
-    </div>
-    <div class="row"><button class="btn" data-a="close">Close</button></div>
-  `);
+    <div class="sec">By category</div>${cats}
+    <div class="sec">Recent walks</div>
+    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span class="lnk">View on map →</span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
+    <div class="sec">Backup</div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Everything lives only on this phone. Export now and then so you never lose your map.</p>
+    <div class="row" style="margin-top:0"><button class="btn" id="bExp">⬇️ Export</button><button class="btn" id="bImp">⬆️ Import</button></div>
+    <div class="row"><button class="btn" id="bRef">🔄 Refresh place photos</button></div>`;
+  $('statsBody').querySelectorAll('[data-w]').forEach(r=>r.onclick=()=>{ const w=walks.find(x=>x.id===r.dataset.w); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]}); });
+  $('bExp').onclick=exportData; $('bImp').onclick=()=>$('fileImport').click();
+  $('bRef').onclick=async()=>{ teasers={}; LS.set('ud_teasers',teasers); toast('Refreshing photos…'); await warmTeasers(); renderMarkers(); toast('Photos refreshed'); };
 }
 
-function addSpot(){
-  if (!lastPos) { toast('Start a walk first so I know where you are'); return; }
-  openSheet(`
-    <h2>➕ New spot</h2>
-    <p>Save this exact place as your own quest: a café, a door, a view, anything worth remembering.</p>
-    <input type="text" id="spotName" placeholder="Name of the place" maxlength="60">
-    <input type="text" id="spotTask" placeholder="What's the challenge? (optional)" maxlength="120">
-    <div class="row">
-      <button class="btn" data-a="spotsave" data-kind="photo">📷 Save as photo quest</button>
-      <button class="btn" data-a="spotsave" data-kind="selfie">🤳 Selfie quest</button>
-    </div>
-    <div class="row"><button class="btn" data-a="close">Cancel</button></div>`);
-  setTimeout(() => { const i = document.getElementById('spotName'); i && i.focus(); }, 300);
-}
-
+/* ================= Backup ================= */
 async function exportData(){
-  const payload = { app:'unfog-damascus', v:1, at:new Date().toISOString(), cells:[...cells], done, custom, bonusXp, photos: await allPhotos() };
-  const blob = new Blob([JSON.stringify(payload)], { type:'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'unfog-damascus-' + new Date().toISOString().slice(0,10) + '.json';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,photos:await allPhotos()};
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
+  a.download='unfog-damascus-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   toast('Backup saved to Downloads');
 }
-async function importData(file){
-  try {
-    const p = JSON.parse(await file.text());
-    if (p.app !== 'unfog-damascus') throw 0;
-    (p.cells || []).forEach(c => cells.add(c));
-    Object.assign(done, p.done || {});
-    for (const c of (p.custom || [])) if (!custom.find(x => x.id === c.id)) custom.push(c);
-    for (const id in (p.photos || {})) await putPhoto(id, p.photos[id]);
-    LS.set('ud_cells', [...cells]); LS.set('ud_done', done); LS.set('ud_custom', custom);
-    drawFog(); renderMarkers(); renderHud(); closeSheet(); toast('Backup restored');
-  } catch(e){ toast('That file is not a valid backup'); }
+async function importData(f){
+  try{ const p=JSON.parse(await f.text()); if(p.app!=='unfog-damascus') throw 0;
+    (p.cells||[]).forEach(c=>cells.add(c)); Object.assign(visits,p.visits||{}); Object.assign(shots,p.shots||{});
+    for(const c of (p.custom||[])) if(!custom.find(x=>x.id===c.id)) custom.push(c);
+    for(const w of (p.walks||[])) if(!walks.find(x=>x.id===w.id)) walks.push(w);
+    for(const k in (p.photos||{})) await putPhoto(k,p.photos[k]);
+    LS.set('ud_cells',[...cells]); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_custom2',custom); LS.set('ud_walks',walks);
+    drawFog(); drawTrails(); renderMarkers(); renderHud(); renderStats(); toast('Backup restored');
+  }catch(e){ toast('That file is not a valid backup'); }
 }
-document.getElementById('fileImport').onchange = e => { const f = e.target.files[0]; e.target.value = ''; f && importData(f); };
+$('fileImport').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; f&&importData(f); };
 
-sheet.addEventListener('click', e => {
-  const el = e.target.closest('[data-a]'); if (!el) return;
-  const a = el.dataset.a, id = el.dataset.id;
-  const q = id && allQuests().find(x => x.id === id);
-  if (a === 'close') closeSheet();
-  else if (a === 'unlock' || a === 'retake') q && takePhoto(q);
-  else if (a === 'goto') { if (q) { closeSheet(); follow = false; map.setView([q.lat, q.lng], 17); setTimeout(() => openQuest(id), 250); } }
-  else if (a === 'addspot') addSpot();
-  else if (a === 'locate') { closeSheet(); follow = true; if (lastPos) map.setView(lastPos, 17); else toast('Start a walk first'); }
-  else if (a === 'export') exportData();
-  else if (a === 'import') document.getElementById('fileImport').click();
-  else if (a === 'delcustom') {
-    if (el.dataset.confirm) { custom = custom.filter(x => x.id !== id); delete done[id]; LS.set('ud_custom', custom); LS.set('ud_done', done); renderMarkers(); renderHud(); closeSheet(); toast('Spot deleted'); }
-    else { el.dataset.confirm = '1'; el.textContent = 'Tap again to confirm'; }
-  }
-  else if (a === 'spotsave') {
-    const name = (document.getElementById('spotName').value || '').trim();
-    if (!name) { toast('Give the spot a name'); return; }
-    const task = (document.getElementById('spotTask').value || '').trim();
-    const s = { id:'c' + Date.now(), ic: el.dataset.kind === 'selfie' ? '⭐' : '📌', name, ar:'', task: task || 'Your own spot.', lat:lastPos[0], lng:lastPos[1], kind:el.dataset.kind, custom:true };
-    custom.push(s); LS.set('ud_custom', custom);
-    renderMarkers(); renderHud(); closeSheet(); toast('📌 Spot saved'); setTimeout(() => openQuest(s.id), 300);
-  }
-});
+/* ================= Tools ================= */
+function syncTools(){ $('tFog').classList.toggle('off',!settings.fog); $('tTrail').classList.toggle('off',!settings.trails); }
+$('tFog').onclick=()=>{ settings.fog=!settings.fog; LS.set('ud_settings',settings); syncTools(); drawFog(); toast(settings.fog?'Fog on':'Fog off: full map view'); };
+$('tTrail').onclick=()=>{ settings.trails=!settings.trails; LS.set('ud_settings',settings); syncTools(); drawTrails(); toast(settings.trails?'Trails shown':'Trails hidden'); };
+$('tMe').onclick=()=>{ follow=true; if(lastPos) map.setView(lastPos,17); else toast('Start a walk to find you'); };
 
-document.getElementById('btnQuests').onclick = openQuests;
-document.getElementById('btnMenu').onclick = openMenu;
-
-// ---------- Boot ----------
-openDB().then(() => { drawFog(); renderMarkers(); renderHud(); });
-drawFog();
-if (!window.isSecureContext) setTimeout(() => toast('Open this from an https:// link to use GPS'), 800);
+/* ================= Boot ================= */
+syncTools(); drawFog(); drawTrails(); renderMarkers(); renderHud();
+openDB();
+if(!window.isSecureContext) setTimeout(()=>toast('Open from an https:// link to use GPS'),800);
+setTimeout(warmTeasers,600);
+if(!LS.get('ud_seen2',false)){ LS.set('ud_seen2',true); setTimeout(()=>openSheet(`<div class="grab"></div><div class="sh"><h2>🌫️ Unfog Damascus</h2>
+  <p>The city is covered in mist. Walk to clear it: every street you take stays lit, and every walk leaves a glowing trail.</p>
+  <p>📍 Tap a place to see its story, the best time to go, and its <b>shot list</b>. Get there, take the shots, and earn XP.</p>
+  <p>⭐ <b>Long-press</b> anywhere on the map to add your own place.</p>
+  <div class="row"><button class="btn pri" data-a="close">Let's go</button></div></div>`),900); }
 })();
 </script>
 </body>
