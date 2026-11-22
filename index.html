@@ -156,6 +156,17 @@
   .pin .l{margin-top:3px;font-size:11px;font-weight:700;color:#fff;background:rgba(14,20,36,.82);padding:1px 7px;border-radius:8px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
   .hidelabels .pin .l{display:none}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(242,198,109,.9)}100%{box-shadow:0 0 0 18px rgba(242,198,109,0)}}
+  .av{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex:none;border:2.5px solid var(--gold);background:#1a2340}
+  .frow{display:flex;align-items:center;gap:10px;padding:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:8px}
+  .frow .tx{flex:1;font-size:14px}.frow small{display:block;color:var(--muted);font-size:11px}
+  .sbox{display:flex;gap:8px;align-items:center}
+  .sres{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}
+  .sres .ic{width:34px;height:34px;border-radius:10px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
+  .sres .tx{flex:1;min-width:0;font-size:14px}.sres small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  textarea.f{width:100%;background:#0f1628;border:1px solid #2d3858;color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;font-size:14px;min-height:80px;resize:vertical}
+  .fstrip{display:flex;gap:6px;overflow-x:auto;margin:6px 0}
+  .fstrip img{width:70px;height:70px;border-radius:10px;object-fit:cover;flex:none}
+  #live{cursor:pointer}
   .me{width:20px;height:20px;border-radius:50%;background:#4ea3ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(78,163,255,.25)}
 </style>
 </head>
@@ -172,6 +183,7 @@
 </div>
 
 <div id="tools">
+  <button class="glass tool" id="tSearch" title="Search">🔍</button>
   <button class="glass tool" id="tFog" title="Fog">🌫️</button>
   <button class="glass tool" id="tTrail" title="Trails">〰️</button>
   <button class="glass tool" id="tMe" title="Center on me">📍</button>
@@ -214,7 +226,7 @@
 
 <input type="file" id="fileEnv" accept="image/*" capture="environment" hidden>
 <input type="file" id="fileUser" accept="image/*" capture="user" hidden>
-<input type="file" id="fileImport" accept="application/json,.json" hidden>
+<input type="file" id="fileImport" accept="application/json,.json,text/plain,.txt,.unfog" hidden>
 
 <script>
 (() => {
@@ -338,6 +350,12 @@ let shots  = LS.get('ud_shots',{});    // placeId#i -> ts
 let custom = LS.get('ud_custom2',[]);
 let walks  = LS.get('ud_walks',[]);
 let teasers= LS.get('ud_teasers',{});  // placeId -> {photos:[], extract, url}
+let me = LS.get('ud_me',null);
+if(!me){ me={ id:'u'+Math.random().toString(36).slice(2,10), name:'', emoji:'🧭', color:'#ffd77e' }; LS.set('ud_me',me); }
+let friends = LS.get('ud_friends',{});   // id -> {id,name,emoji,color}
+let fwalks  = LS.get('ud_fwalks',[]);    // walks shared by friends {..., from}
+let fshots  = LS.get('ud_fshots',{});    // idbKey -> {pid, from, label, ts}
+let covers  = LS.get('ud_covers',{});    // placeId -> small dataURL from your own shot
 let settings = Object.assign({ fog:true, trails:true }, LS.get('ud_settings',{}));
 const saveCells = debounce(()=>LS.set('ud_cells',[...cells]),1500);
 
@@ -408,14 +426,17 @@ map.on('move zoom resize viewreset',drawFog);
 /* ---- trails ---- */
 const trailLayer=L.layerGroup().addTo(map);
 let liveLine=null, liveGlow=null;
-function lineFor(pts,live){
-  const glow=L.polyline(pts,{pane:'trails',color:live?'#7ff0aa':'#ffd77e',weight:12,opacity:.35,lineCap:'round',lineJoin:'round',interactive:false});
-  const core=L.polyline(pts,{pane:'trails',color:live?'#b9ffd3':'#ffe08a',weight:4,opacity:1,lineCap:'round',lineJoin:'round',interactive:false});
+function lighten(h){ const n=parseInt(h.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255,m=c=>Math.round(c+(255-c)*.45); return '#'+[m(r),m(g),m(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function lineFor(pts,live,color){
+  const c=color||me.color||'#ffd77e';
+  const glow=L.polyline(pts,{pane:'trails',color:live===true?'#7ff0aa':c,weight:12,opacity:.35,lineCap:'round',lineJoin:'round',interactive:false});
+  const core=L.polyline(pts,{pane:'trails',color:live===true?'#b9ffd3':lighten(c),weight:4,opacity:1,lineCap:'round',lineJoin:'round',interactive:false,dashArray:live===2?'1 9':null});
   return [glow,core];
 }
 function drawTrails(){
   trailLayer.clearLayers(); liveLine=liveGlow=null;
   if(!settings.trails) return;
+  for(const w of fwalks) if(w.pts.length>1){ const f=friends[w.from]; lineFor(w.pts,2,f&&f.color).forEach(l=>l.addTo(trailLayer)); }
   for(const w of walks) if(w.pts.length>1) lineFor(w.pts).forEach(l=>l.addTo(trailLayer));
   if(cur&&cur.pts.length>1){ [liveGlow,liveLine]=lineFor(cur.pts,true); liveGlow.addTo(trailLayer); liveLine.addTo(trailLayer); }
 }
@@ -424,7 +445,7 @@ function drawTrails(){
 const markers={};
 let lastPos=null;
 function pinHtml(p){
-  const t=teasers[p.id], img=t&&t.photos&&t.photos[0];
+  const t=teasers[p.id], img=(t&&t.photos&&t.photos[0])||covers[p.id];
   const near=lastPos&&!visits[p.id]&&dist(lastPos[0],lastPos[1],p.lat,p.lng)<=NEAR_M;
   const cls='pin'+(visits[p.id]?' done':'')+(near?' near':'');
   const bg=img?`background-image:url('${img}');`:'';
@@ -483,7 +504,7 @@ function renderHud(){
 function setGps(state,txt){ $('gpsDot').style.background=state==='ok'?'#5fd38d':state==='wait'?'#f2c66d':state==='err'?'#ff6b6b':'#667'; $('gpsTxt').textContent=txt; }
 
 /* ================= Walking ================= */
-let watchId=null, me=null, acc=null, wake=null, follow=true, cur=LS.get('ud_curwalk',null), lastFix=null, liveT=null;
+let watchId=null, meMk=null, acc=null, wake=null, follow=true, cur=LS.get('ud_curwalk',null), lastFix=null, liveT=null;
 if(cur){ if(cur.pts&&cur.pts.length>1) walks.push(finalize(cur)); cur=null; LS.set('ud_walks',walks); LS.set('ud_curwalk',null); }
 function finalize(w){ w.end=w.end||w.last||Date.now(); delete w.last; return w; }
 function reveal(lat,lng){ let n=0; const s=Math.ceil(REVEAL_M/15); for(let i=-s;i<=s;i++) for(let j=-s;j<=s;j++){ const a=lat+i*CELL,o=lng+j*CELL; if(dist(lat,lng,a,o)>REVEAL_M*.6) continue; const k=key(a,o); if(!cells.has(k)){cells.add(k);n++;} } return n; }
@@ -509,15 +530,25 @@ function onFix(pos){
     }
   }
   lastFix=[lat,lng]; lastPos=[lat,lng];
-  if(!me){ me=L.marker([lat,lng],{icon:L.divIcon({html:'<div class="me"></div>',className:'',iconSize:[20,20],iconAnchor:[10,10]}),zIndexOffset:2000}).addTo(map); acc=L.circle([lat,lng],{radius:ac,color:'#4ea3ff',weight:1,fillOpacity:.07,interactive:false}).addTo(map); }
-  else { me.setLatLng([lat,lng]); acc.setLatLng([lat,lng]).setRadius(ac); }
+  if(!meMk){ meMk=L.marker([lat,lng],{icon:L.divIcon({html:'<div class="me"></div>',className:'',iconSize:[20,20],iconAnchor:[10,10]}),zIndexOffset:2000}).addTo(map); acc=L.circle([lat,lng],{radius:ac,color:'#4ea3ff',weight:1,fillOpacity:.07,interactive:false}).addTo(map); }
+  else { meMk.setLatLng([lat,lng]); acc.setLatLng([lat,lng]).setRadius(ac); }
   if(follow) map.panTo([lat,lng],{animate:false});
   if(added){ saveCells(); drawFog(); }
   renderHud(); renderMarkers(); renderLive();
   for(const p of places()){ if(visits[p.id]||p._nudged) continue; if(dist(lat,lng,p.lat,p.lng)<=NEAR_M){ p._nudged=true; vibrate(200); toast(`${CATS[p.cat].ic} You're at ${p.name}. Tap it to start the shot list!`); } }
 }
 function onErr(e){ if(e.code===1){ setGps('err','Denied'); toast('Location permission denied. Enable it in Chrome settings.'); stopWalk(true); } else setGps('wait','Searching…'); }
-function renderLive(){ if(!cur){ $('live').classList.remove('show'); return; } $('live').classList.add('show'); $('live').textContent=`🚶 ${fmtD(cur.dist)} · ${fmtT(Date.now()-cur.start)} · +${cells.size-cur.cells0} tiles`; }
+function renderLive(){ if(!cur){ $('live').classList.remove('show'); return; } $('live').classList.add('show'); const w=cur.with&&cur.with.length?' · 👥 '+cur.with.map(x=>x.emoji).join(''):' · 👥 +'; $('live').textContent=`🚶 ${fmtD(cur.dist)} · ${fmtT(Date.now()-cur.start)} · +${cells.size-cur.cells0} tiles${w}`; }
+$('live').onclick=()=>openCompanions();
+function openCompanions(){
+  if(!cur) return; const sel=new Set((cur.with||[]).map(x=>x.id));
+  const fl=Object.values(friends);
+  openSheet(`<div class="grab"></div><div class="sh"><h2>👥 Walking with…</h2>
+    <p style="color:var(--muted);font-size:13px">Tag who's with you. At the end, share the walk with them and it lands on their phone too.</p>
+    ${fl.length?fl.map(f=>`<div class="frow" data-a="comp" data-id="${esc(f.id)}"><span class="av" style="border-color:${f.color}">${esc(f.emoji)}</span><div class="tx">${esc(f.name)}</div><b style="color:${sel.has(f.id)?'var(--ok)':'var(--muted)'}">${sel.has(f.id)?'✓ With you':'Add'}</b></div>`).join(''):''}
+    <label class="f">Someone new</label><div class="sbox"><input class="f" id="compName" placeholder="Their name" maxlength="30"><button class="btn pri" style="flex:none" data-a="compadd">Add</button></div>
+    <div class="row"><button class="btn" data-a="close">Done</button></div></div>`);
+}
 async function startWalk(){
   if(!('geolocation' in navigator)){ toast('No GPS in this browser'); return; }
   if(!window.isSecureContext){ toast('GPS needs an https:// link'); return; }
@@ -557,8 +588,9 @@ function showSummary(w){
       <div><b>${nv}</b><span>places</span></div>
       <div><b>${ns}</b><span>shots</span></div>
     </div>
+    ${w.with&&w.with.length?`<p>👥 Together with ${w.with.map(x=>esc(x.emoji+' '+x.name)).join(', ')}</p>`:''}
     <p>${newTiles>20?'You uncovered a real chunk of the city today.':'Every street counts. Next time, take a turn you never take.'}</p>
-    <div class="row"><button class="btn pri" data-a="close">Nice</button></div></div>`);
+    <div class="row"><button class="btn" data-a="sharewalk" data-id="${esc(w.id)}">📤 Share walk</button><button class="btn pri" data-a="close">Nice</button></div></div>`);
 }
 
 /* ================= Sheets ================= */
@@ -573,10 +605,13 @@ async function openPlace(id){
   const d=lastPos?dist(lastPos[0],lastPos[1],p.lat,p.lng):null;
   const near=d!==null&&d<=NEAR_M;
   const t=teasers[p.id];
-  const photos=t&&t.photos||[];
+  const photos=((t&&t.photos)||[]).slice();
+  if(covers[p.id]&&p.custom) photos.unshift(covers[p.id]); else if(!photos.length&&covers[p.id]) photos.push(covers[p.id]);
+  const fk=Object.keys(fshots).filter(k=>fshots[k].pid===p.id);
+  const fimgs=await Promise.all(fk.map(k=>getPhoto(k)));
   const mine=await Promise.all(p.shots.map((_,i)=>shots[p.id+'#'+i]?getPhoto(p.id+'#'+i):null));
   const done=shotsDone(p);
-  const bio=p.bio||(t&&t.extract)||'';
+  const bio=p.story||p.bio||(t&&t.extract)||'';
   openSheet(`<div class="grab"></div>
     ${photos.length?`<div class="carousel">${photos.map(u=>`<img src="${esc(u)}" loading="lazy" referrerpolicy="no-referrer">`).join('')}</div>`
       :`<div class="hero" style="background:linear-gradient(135deg,${c.c}33,#1d2742)">${c.ic}</div>`}
@@ -598,6 +633,7 @@ async function openPlace(id){
         <button data-a="shoot" data-id="${esc(p.id)}" data-i="${i}" ${near?'':'disabled'}>${mine[i]?'Retake':(p.selfie&&i===0?'🤳':'📷')}</button>
       </div>`).join('')}
       ${!near?`<p style="font-size:12px;color:var(--muted)">🔒 Get within ${NEAR_M} m to take the shots.</p>`:''}
+      ${fk.length?`<div class="sec">👥 From friends</div><div class="fstrip">${fk.map((k,i)=>fimgs[i]?`<img src="${fimgs[i]}" data-a="fview" data-k="${esc(k)}">`:'').join('')}</div>`:''}
       ${p.tip?`<div class="tip">💡 ${esc(p.tip)}</div>`:''}
       <div class="row">
         <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking" target="_blank" rel="noopener">🧭 Directions</a>
@@ -605,18 +641,20 @@ async function openPlace(id){
       </div>
       ${p.custom?`<div class="row"><button class="btn" data-a="editplace" data-id="${esc(p.id)}">✏️ Edit</button><button class="btn danger" data-a="delplace" data-id="${esc(p.id)}">Delete</button></div>`:''}
     </div>`);
-  if(!t){ const nt=await fetchTeaser(p); if(sheet.classList.contains('open')&&(nt.photos.length||nt.extract)) { renderMarkers(); openPlace(id); } else { const b=$('bioLoad'); if(b) b.textContent='No info found online. Add your own story by exploring it.'; } }
+  if(!t&&!p._looked){ p._looked=true; const nt=await fetchTeaser(p); if(sheet.classList.contains('open')&&(nt.photos.length||nt.extract)) { renderMarkers(); openPlace(id); } else { const b=$('bioLoad'); if(b) b.textContent='No info found online. Add your own story by exploring it.'; } }
 }
 
 /* ---- photos ---- */
 let pending=null;
 function shoot(p,i){ pending={p,i}; $((p.selfie&&i===0)?'fileUser':'fileEnv').click(); }
 async function compress(file){ const u=URL.createObjectURL(file); try{ const img=await new Promise((res,rej)=>{const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=u;}); const s=Math.min(1,1400/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.82); } finally{ URL.revokeObjectURL(u); } }
+async function thumb(src){ const im=await new Promise((res,rej)=>{const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src;}); const s=Math.min(1,240/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.round(im.width*s); c.height=Math.round(im.height*s); c.getContext('2d').drawImage(im,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.72); }
 async function onPhoto(e){
   const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f||!pending) return;
   const {p,i}=pending; pending=null; const k=p.id+'#'+i;
   try{
-    await putPhoto(k,await compress(f));
+    const data=await compress(f); await putPhoto(k,data);
+    if(!covers[p.id]){ covers[p.id]=await thumb(data); LS.set('ud_covers',covers); }
     const firstVisit=!visits[p.id], firstShot=!shots[k];
     shots[k]=shots[k]||Date.now(); LS.set('ud_shots',shots);
     if(firstVisit){ visits[p.id]=Date.now(); LS.set('ud_visits',visits); }
@@ -632,8 +670,10 @@ $('fileEnv').onchange=onPhoto; $('fileUser').onchange=onPhoto;
 let vList=[], vIdx=0;
 async function openViewer(list,idx){ vList=list; vIdx=idx; await showV(); $('viewer').classList.add('open'); }
 async function showV(){
-  const k=vList[vIdx], [pid,i]=k.split('#'), p=placeById(pid), src=await getPhoto(k);
-  $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${esc(p?p.name:'')}</b><small>${esc(p?p.shots[+i]||'':'')} · ${shots[k]?new Date(shots[k]).toLocaleDateString():''}</small></div>
+  const k=vList[vIdx], fs=fshots[k], [pid0,i]=k.split('#'), pid=fs?fs.pid:pid0, p=placeById(pid), src=await getPhoto(k);
+  const sub=fs?`📸 by ${esc((friends[fs.from]||{}).name||'a friend')} · ${esc(fs.label||'')}`:`${esc(p?p.shots[+i]||'':'')}`;
+  const dt=fs?fs.ts:shots[k];
+  $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${esc(p?p.name:'')}</b><small>${sub} · ${dt?new Date(dt).toLocaleDateString():''}</small></div>
    <div class="vnav"><button class="btn" data-v="-1" ${vIdx?'':'disabled'}>‹</button><button class="btn" data-v="x">Close</button><button class="btn" data-v="1" ${vIdx<vList.length-1?'':'disabled'}>›</button></div>`;
 }
 $('viewer').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; if(b.dataset.v==='x') $('viewer').classList.remove('open'); else { vIdx=Math.max(0,Math.min(vList.length-1,vIdx+ +b.dataset.v)); showV(); } };
@@ -652,13 +692,14 @@ function placeForm(title){
     <input class="f" id="dS0" value="${esc(draft.shots[0]||'')}" placeholder="One photo that captures it" style="margin-bottom:6px">
     <input class="f" id="dS1" value="${esc(draft.shots[1]||'')}" placeholder="A detail most people miss" style="margin-bottom:6px">
     <input class="f" id="dS2" value="${esc(draft.shots[2]||'')}" placeholder="A selfie there">
-    <label class="f">Your note / tip (optional)</label><input class="f" id="dTip" value="${esc(draft.tip||'')}" maxlength="140">
+    <label class="f">Story (optional, your own words about the place)</label><textarea class="f" id="dStory" maxlength="800" placeholder="What is this place? Why does it matter to you?">${esc(draft.story||'')}</textarea>
+    <label class="f">Tip (optional)</label><input class="f" id="dTip" value="${esc(draft.tip||'')}" maxlength="140">
     <div class="row"><button class="btn pri" data-a="dsave">Save place</button><button class="btn" data-a="close">Cancel</button></div>
     <p style="font-size:12px;color:var(--muted)">Photos and history are looked up online by the name.</p>
   </div>`);
 }
-function readDraft(){ draft.name=$('dName').value.trim(); draft.shots=['dS0','dS1','dS2'].map(i=>$(i).value.trim()).filter(Boolean); draft.tip=$('dTip').value.trim(); }
-function addPlaceAt(lat,lng){ draft={ id:'c'+Date.now(), custom:true, cat:'mine', time:'any', name:'', shots:[], tip:'', lat:+lat.toFixed(6), lng:+lng.toFixed(6) }; placeForm('➕ New place'); }
+function readDraft(){ draft.name=$('dName').value.trim(); draft.shots=['dS0','dS1','dS2'].map(i=>$(i).value.trim()).filter(Boolean); draft.tip=$('dTip').value.trim(); draft.story=$('dStory').value.trim(); }
+function addPlaceAt(lat,lng,name,cat){ draft={ id:'c'+Date.now(), custom:true, cat:cat||'mine', time:'any', name:name||'', shots:[], tip:'', story:'', lat:+lat.toFixed(6), lng:+lng.toFixed(6) }; placeForm('➕ New place'); }
 map.on('contextmenu',e=>addPlaceAt(e.latlng.lat,e.latlng.lng));
 
 /* ---- sheet actions ---- */
@@ -687,6 +728,16 @@ sheet.addEventListener('click',async e=>{
     LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_teasers',teasers);
     renderMarkers(); renderHud(); closeSheet(); toast('Place deleted');
   }
+  else if(a==='fview'){ const ks=Object.keys(fshots).filter(k=>fshots[k].pid===fshots[el.dataset.k].pid); openViewer(ks,ks.indexOf(el.dataset.k)); }
+  else if(a==='sharewalk'){ const w=walks.find(x=>x.id===el.dataset.id); w&&shareWalk(w); }
+  else if(a==='addres'){ const r=searchRes[+el.dataset.i]; if(r){ if(searchPin){map.removeLayer(searchPin);searchPin=null;} addPlaceAt(r.lat,r.lng,r.name,r.cat); } }
+  else if(a==='gores'){ const r=searchRes[+el.dataset.i]; if(r) goResult(r); }
+  else if(a==='openp'){ const p=placeById(el.dataset.id); if(p){ closeSheet(); follow=false; map.setView([p.lat,p.lng],17); setTimeout(()=>openPlace(p.id),150); } }
+  else if(a==='comp'){ const id=el.dataset.id; if(!cur) return; cur.with=cur.with||[]; const i=cur.with.findIndex(x=>x.id===id); if(i>=0) cur.with.splice(i,1); else cur.with.push({id,name:friends[id].name,emoji:friends[id].emoji}); saveCur(); openCompanions(); renderLive(); }
+  else if(a==='compadd'){ const n=($('compName').value||'').trim(); if(!n||!cur) return; const id='n'+Date.now(); friends[id]={id,name:n,emoji:'🙂',color:'#7fb3ff',local:true}; LS.set('ud_friends',friends); cur.with=cur.with||[]; cur.with.push({id,name:n,emoji:'🙂'}); saveCur(); openCompanions(); renderLive(); }
+  else if(a==='pemoji'){ me.emoji=el.dataset.v; LS.set('ud_me',me); openProfile(); }
+  else if(a==='pcolor'){ me.color=el.dataset.v; LS.set('ud_me',me); drawTrails(); openProfile(); }
+  else if(a==='psave'){ me.name=($('pName').value||'').trim(); LS.set('ud_me',me); closeSheet(); toast('Profile saved'); if(curPage==='stats') renderStats(); if(pendingShare){ const w=pendingShare; pendingShare=null; shareWalk(w); } }
   else if(a==='walkview'){ const w=walks.find(x=>x.id===el.dataset.id); if(w){ closeSheet(); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]}); } }
 });
 
@@ -706,7 +757,7 @@ function renderPlaces(){
   let list=places().map(p=>({p,d:lastPos?dist(lastPos[0],lastPos[1],p.lat,p.lng):null}));
   list=list.filter(({p})=> placeFilter==='all'||(placeFilter==='todo'&&!visits[p.id])||(placeFilter==='done'&&visits[p.id])||(placeFilter==='day'&&(p.time==='day'||p.time==='any'))||(placeFilter==='night'&&(p.time==='night'||p.time==='sunset'||p.time==='any'))||p.cat===placeFilter);
   list.sort((a,b)=>(!!visits[a.p.id]-!!visits[b.p.id])||((a.d??1e9)-(b.d??1e9)));
-  $('placeList').innerHTML=list.length?list.map(({p,d})=>{ const t=teasers[p.id],img=t&&t.photos&&t.photos[0],c=CATS[p.cat],sd=shotsDone(p);
+  $('placeList').innerHTML=list.length?list.map(({p,d})=>{ const t=teasers[p.id],img=(t&&t.photos&&t.photos[0])||covers[p.id],c=CATS[p.cat],sd=shotsDone(p);
     return `<div class="pcard" data-p="${esc(p.id)}"><div class="th" style="${img?`background-image:url('${esc(img)}')`:`background:linear-gradient(135deg,${c.c}44,#25304d)`}">${img?'':c.ic}${visits[p.id]?'<span class="ok">✓</span>':''}</div>
       <div class="tx"><div class="nm">${esc(p.name)}</div><div class="ar">${esc(p.ar||c.n)}</div>
       <div class="meta">${TIMES[p.time||'any']}${d!==null?' · '+fmtD(d):''} · 📸 ${sd}/${p.shots.length}</div>
@@ -717,10 +768,10 @@ $('placeFilters').addEventListener('click',e=>{ const b=e.target.closest('[data-
 $('placeList').addEventListener('click',e=>{ const c=e.target.closest('[data-p]'); if(!c) return; const p=placeById(c.dataset.p); go('map'); follow=false; map.setView([p.lat,p.lng],17); setTimeout(()=>openPlace(p.id),120); });
 
 async function renderGallery(){
-  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]);
+  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]).concat(Object.keys(fshots).sort((a,b)=>fshots[b].ts-fshots[a].ts));
   if(!keys.length){ $('galBody').innerHTML=`<div class="empty"><b>📷</b>No photos yet.<br>Visit a place and work through its shot list.</div>`; return; }
   const photos=await allPhotos(); const by={};
-  for(const k of keys){ const pid=k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
+  for(const k of keys){ const pid=fshots[k]?fshots[k].pid:k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
   $('galBody').innerHTML=Object.entries(by).map(([pid,ks])=>{ const p=placeById(pid); return `<div class="galhead">${esc(p?p.name:'Removed place')} · ${ks.length}</div><div class="gal">${ks.map(k=>photos[k]?`<img src="${photos[k]}" data-k="${esc(k)}">`:'').join('')}</div>`; }).join('');
   $('galBody').onclick=e=>{ const im=e.target.closest('img[data-k]'); if(im) openViewer(keys,keys.indexOf(im.dataset.k)); };
 }
@@ -747,11 +798,17 @@ function renderStats(){
     </div>
     <div class="sec">By category</div>${cats}
     <div class="sec">Recent walks</div>
-    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span class="lnk">View on map →</span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
+    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span><button class="lnk" data-ws="${esc(w.id)}" style="margin-right:10px">📤 Share</button><span class="lnk">Map →</span></span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
+    <div class="sec">You & friends</div>
+    <div class="frow" data-fp="1"><span class="av" style="border-color:${me.color}">${esc(me.emoji)}</span><div class="tx">${esc(me.name||'Set your name')}<small>Your avatar and trail colour · tap to edit</small></div><span class="lnk">Edit</span></div>
+    ${Object.values(friends).map(f=>{ const n=fwalks.filter(w=>w.from===f.id).length; return `<div class="frow"><span class="av" style="border-color:${f.color}">${esc(f.emoji)}</span><div class="tx">${esc(f.name)}<small>${n?n+' shared walk'+(n>1?'s':''):'tagged on your walks'}</small></div></div>`; }).join('')}
+    <p style="color:var(--muted);font-size:12px">To get a friend's walk: they tap 📤 Share, send you the file, and you tap ⬆️ Import below.</p>
     <div class="sec">Backup</div>
     <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Everything lives only on this phone. Export now and then so you never lose your map.</p>
-    <div class="row" style="margin-top:0"><button class="btn" id="bExp">⬇️ Export</button><button class="btn" id="bImp">⬆️ Import</button></div>
+    <div class="row" style="margin-top:0"><button class="btn" id="bExp">⬇️ Export</button><button class="btn" id="bImp">⬆️ Import (backup or shared walk)</button></div>
     <div class="row"><button class="btn" id="bRef">🔄 Refresh place photos</button></div>`;
+  $('statsBody').querySelectorAll('[data-ws]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const w=walks.find(x=>x.id===b.dataset.ws); w&&shareWalk(w); });
+  $('statsBody').querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>openProfile());
   $('statsBody').querySelectorAll('[data-w]').forEach(r=>r.onclick=()=>{ const w=walks.find(x=>x.id===r.dataset.w); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]}); });
   $('bExp').onclick=exportData; $('bImp').onclick=()=>$('fileImport').click();
   $('bRef').onclick=async()=>{ teasers={}; LS.set('ud_teasers',teasers); toast('Refreshing photos…'); await warmTeasers(); renderMarkers(); toast('Photos refreshed'); };
@@ -759,17 +816,23 @@ function renderStats(){
 
 /* ================= Backup ================= */
 async function exportData(){
-  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,photos:await allPhotos()};
+  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,me,friends,fwalks,fshots,covers,photos:await allPhotos()};
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
   a.download='unfog-damascus-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   toast('Backup saved to Downloads');
 }
 async function importData(f){
-  try{ const p=JSON.parse(await f.text()); if(p.app!=='unfog-damascus') throw 0;
+  let p; try{ p=JSON.parse(await f.text()); }catch(e){ toast('That file is not a valid backup'); return; }
+  if(p.app==='unfog-walk') return importWalk(p);
+  try{ if(p.app!=='unfog-damascus') throw 0;
     (p.cells||[]).forEach(c=>cells.add(c)); Object.assign(visits,p.visits||{}); Object.assign(shots,p.shots||{});
     for(const c of (p.custom||[])) if(!custom.find(x=>x.id===c.id)) custom.push(c);
     for(const w of (p.walks||[])) if(!walks.find(x=>x.id===w.id)) walks.push(w);
     for(const k in (p.photos||{})) await putPhoto(k,p.photos[k]);
+    if(p.me&&p.me.id===me.id) Object.assign(me,p.me);
+    Object.assign(friends,p.friends||{}); for(const w of (p.fwalks||[])) if(!fwalks.find(x=>x.id===w.id&&x.from===w.from)) fwalks.push(w);
+    Object.assign(fshots,p.fshots||{}); Object.assign(covers,p.covers||{});
+    LS.set('ud_me',me); LS.set('ud_friends',friends); LS.set('ud_fwalks',fwalks); LS.set('ud_fshots',fshots); LS.set('ud_covers',covers);
     LS.set('ud_cells',[...cells]); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_custom2',custom); LS.set('ud_walks',walks);
     drawFog(); drawTrails(); renderMarkers(); renderHud(); renderStats(); toast('Backup restored');
   }catch(e){ toast('That file is not a valid backup'); }
@@ -780,7 +843,111 @@ $('fileImport').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; f&&i
 function syncTools(){ $('tFog').classList.toggle('off',!settings.fog); $('tTrail').classList.toggle('off',!settings.trails); }
 $('tFog').onclick=()=>{ settings.fog=!settings.fog; LS.set('ud_settings',settings); syncTools(); drawFog(); toast(settings.fog?'Fog on':'Fog off: full map view'); };
 $('tTrail').onclick=()=>{ settings.trails=!settings.trails; LS.set('ud_settings',settings); syncTools(); drawTrails(); toast(settings.trails?'Trails shown':'Trails hidden'); };
+$('tSearch').onclick=()=>openSearch();
 $('tMe').onclick=()=>{ follow=true; if(lastPos) map.setView(lastPos,17); else toast('Start a walk to find you'); };
+
+/* ================= Search ================= */
+let searchRes=[], searchPin=null, sT=null, sSeq=0;
+const DAM_BOX='36.18,33.58,36.42,33.44'; // west,north,east,south
+function guessCat(c,t){ const k=(c+':'+t).toLowerCase();
+  if(/cafe|restaurant|fast_food|ice_cream|bakery|confectionery|food|pastry|juice/.test(k)) return 'food';
+  if(/place_of_worship|mosque|church|monastery|shrine|religious/.test(k)) return 'faith';
+  if(/park|garden|nature|forest/.test(k)) return 'parks';
+  if(/marketplace|market|bazaar|mall|souq/.test(k)) return 'souq';
+  if(/museum|historic|castle|monument|memorial|ruins|archaeolog|palace|city_gate|attraction|gallery/.test(k)) return 'heritage';
+  if(/viewpoint|peak|mountain/.test(k)) return 'views';
+  if(/suburb|neighbourhood|quarter|residential/.test(k)) return 'quarter';
+  return 'mine'; }
+function openSearch(){
+  openSheet(`<div class="grab"></div><div class="sh"><h2>🔍 Find a place</h2>
+    <input class="f" id="sq" placeholder="Café, mosque, street… (English or عربي)" autocomplete="off" style="margin-top:10px">
+    <div id="sOut"><p style="color:var(--muted);font-size:13px">Searches your places and all of Damascus on OpenStreetMap.</p></div>
+    <div class="row"><button class="btn" data-a="close">Close</button></div></div>`);
+  const i=$('sq'); setTimeout(()=>i.focus(),250);
+  i.oninput=()=>{ clearTimeout(sT); sT=setTimeout(()=>runSearch(i.value.trim()),550); };
+  i.onkeydown=e=>{ if(e.key==='Enter'){ clearTimeout(sT); runSearch(i.value.trim()); } };
+}
+async function runSearch(q){
+  const out=$('sOut'); if(!out) return;
+  if(q.length<2){ out.innerHTML=''; return; }
+  const seq=++sSeq, ql=q.toLowerCase();
+  const local=places().filter(p=>(p.name+' '+(p.ar||'')).toLowerCase().includes(ql)).slice(0,6);
+  const lh=local.map(p=>`<div class="sres" data-a="openp" data-id="${esc(p.id)}"><div class="ic">${visits[p.id]?'✅':CATS[p.cat].ic}</div><div class="tx">${esc(p.name)}<small>In your places${p.ar?' · '+esc(p.ar):''}</small></div></div>`).join('');
+  out.innerHTML=lh+'<p style="color:var(--muted);font-size:12px;margin:10px 0 0">Searching the map…</p>';
+  let res=[];
+  try{
+    const u='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=12&bounded=1&viewbox='+DAM_BOX+'&accept-language=en,ar&q='+encodeURIComponent(q);
+    const j=await (await fetch(u,{headers:{'Accept':'application/json'}})).json();
+    res=(j||[]).map(r=>({ name:(r.name||r.display_name.split(',')[0]).trim(), addr:r.display_name.split(',').slice(1,3).join(',').trim(), lat:+r.lat, lng:+r.lon, cat:guessCat(r.category||r.class||'',r.type||''), type:(r.type||'').replace(/_/g,' ') }))
+      .filter(r=>r.name&&!local.some(p=>dist(p.lat,p.lng,r.lat,r.lng)<40));
+  }catch(e){}
+  if(seq!==sSeq||!$('sOut')) return;
+  searchRes=res;
+  out.innerHTML=lh+(res.length?res.map((r,i)=>`<div class="sres"><div class="ic">${CATS[r.cat].ic}</div><div class="tx" data-a="gores" data-i="${i}">${esc(r.name)}<small>${esc(r.type)}${r.addr?' · '+esc(r.addr):''}</small></div><button class="lnk" data-a="gores" data-i="${i}">Show</button></div>`).join('')
+    :`<p style="color:var(--muted);font-size:13px;margin-top:10px">${lh?'Nothing more on the map.':'Nothing found on the map. Try another spelling, or long-press the spot to add it yourself.'}</p>`);
+}
+function goResult(r){
+  closeSheet(); go('map'); follow=false; map.setView([r.lat,r.lng],18);
+  if(searchPin) map.removeLayer(searchPin);
+  searchPin=L.marker([r.lat,r.lng],{icon:L.divIcon({html:`<div class="pin"><div class="c" style="border-color:#fff;border-style:dashed">${CATS[r.cat].ic}</div><div class="l" style="display:block">${esc(r.name)}</div></div>`,className:'',iconSize:[38,38],iconAnchor:[19,19]})}).addTo(map);
+  const i=searchRes.indexOf(r);
+  setTimeout(()=>openSheet(`<div class="grab"></div><div class="sh"><h2>${CATS[r.cat].ic} ${esc(r.name)}</h2><p style="color:var(--muted)">${esc(r.type)}${r.addr?' · '+esc(r.addr):''}</p>
+    <div class="row"><button class="btn pri" data-a="addres" data-i="${i}">➕ Add to my places</button><button class="btn" data-a="close">Just looking</button></div></div>`),200);
+}
+
+/* ================= Profile ================= */
+let pendingShare=null;
+function openProfile(){
+  const em=['🧭','🦅','🐺','🦁','🐪','🦊','🐢','🚶','🧗','📸','☕','🌙','⭐','🔥','🌿','🎒'];
+  const co=['#ffd77e','#ff8a65','#ff7a9c','#c49bff','#7fb3ff','#5fd3c4','#8fd18f','#f2f2f2'];
+  openSheet(`<div class="grab"></div><div class="sh"><h2>Your explorer</h2>
+    <div style="display:flex;justify-content:center;margin:12px 0"><span class="av" style="width:70px;height:70px;font-size:36px;border-width:4px;border-color:${me.color}">${esc(me.emoji)}</span></div>
+    <label class="f">Name (friends see this on shared walks)</label><input class="f" id="pName" value="${esc(me.name)}" maxlength="30" placeholder="Yousuf">
+    <label class="f">Avatar</label><div class="seg">${em.map(e=>`<button data-a="pemoji" data-v="${e}" class="${me.emoji===e?'act':''}" style="font-size:18px">${e}</button>`).join('')}</div>
+    <label class="f">Trail colour</label><div class="seg">${co.map(c=>`<button data-a="pcolor" data-v="${c}" class="${me.color===c?'act':''}" style="width:38px;height:34px;background:${c};border-color:${me.color===c?'#fff':c}"></button>`).join('')}</div>
+    <div class="row"><button class="btn pri" data-a="psave">Save</button></div></div>`);
+  const n=$('pName'); n.oninput=()=>{ me.name=n.value.trim(); };
+}
+
+/* ================= Together walks ================= */
+async function shareWalk(w){
+  if(!me.name){ pendingShare=w; toast('First, set your name'); openProfile(); return; }
+  const all=await allPhotos(); const photos={}, meta={};
+  for(const k in shots){ if(shots[k]>=w.start&&shots[k]<=(w.end||Date.now())+60000&&all[k]){ photos[k]=all[k]; const [pid,i]=k.split('#'); const p=placeById(pid); meta[k]={pid,label:p?p.shots[+i]:'',ts:shots[k]}; } }
+  const pids=new Set(Object.values(meta).map(m=>m.pid));
+  const placesOut=custom.filter(p=>pids.has(p.id));
+  const payload={ app:'unfog-walk', v:1, from:{id:me.id,name:me.name,emoji:me.emoji,color:me.color}, walk:{id:w.id,start:w.start,end:w.end,dist:w.dist,pts:w.pts,with:w.with||[]}, meta, photos, places:placesOut };
+  const fname=`walk-${me.name.replace(/[^\w؀-ۿ]+/g,'-')}-${new Date(w.start).toISOString().slice(0,10)}`;
+  const text=JSON.stringify(payload);
+  for(const [ext,type] of [['.json','application/json'],['.txt','text/plain']]){
+    try{ const file=new File([text],fname+ext,{type}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'Unfog walk',text:`${me.emoji} My Unfog walk: ${fmtD(w.dist)}. Open Unfog → Stats → Import.`}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'application/json'})); a.download=fname+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  toast('Walk saved to Downloads. Send it to your friend.');
+}
+async function importWalk(p){
+  try{
+    const f=p.from; if(!f||!p.walk) throw 0;
+    if(f.id===me.id){ toast("That's your own walk 🙂"); return; }
+    friends[f.id]=Object.assign(friends[f.id]||{},{id:f.id,name:f.name,emoji:f.emoji,color:f.color});
+    // merge a locally-tagged companion with the same name
+    for(const id in friends){ if(friends[id].local&&friends[id].name.trim().toLowerCase()===String(f.name).trim().toLowerCase()) delete friends[id]; }
+    if(fwalks.find(x=>x.id===p.walk.id&&x.from===f.id)){ toast('You already have this walk'); return; }
+    const w=Object.assign({},p.walk,{from:f.id}); fwalks.push(w);
+    const before=cells.size;
+    for(let i=0;i<w.pts.length;i++){ const [a,o]=w.pts[i]; if(i){ const [pa,po]=w.pts[i-1]; const d=dist(pa,po,a,o); if(d<400){ const n=Math.max(1,Math.ceil(d/10)); for(let s=1;s<=n;s++) reveal(pa+(a-pa)*s/n,po+(o-po)*s/n); continue; } } reveal(a,o); }
+    for(const pl of (p.places||[])) if(!placeById(pl.id)) custom.push(Object.assign({},pl,{sharedBy:f.name}));
+    let np=0;
+    for(const k in (p.photos||{})){ const nk='f:'+f.id+':'+k; await putPhoto(nk,p.photos[k]); const m=(p.meta||{})[k]||{}; fshots[nk]={pid:m.pid||k.split('#')[0],from:f.id,label:m.label||'',ts:m.ts||w.start}; if(m.pid&&placeById(m.pid)&&!visits[m.pid]){ visits[m.pid]=m.ts||w.start; } np++; }
+    LS.set('ud_friends',friends); LS.set('ud_fwalks',fwalks); LS.set('ud_fshots',fshots); LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_cells',[...cells]);
+    drawFog(); drawTrails(); renderMarkers(); renderHud(); if(curPage==='stats') renderStats();
+    go('map'); follow=false; if(w.pts.length>1) map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]});
+    openSheet(`<div class="grab"></div><div class="sh"><h2>${esc(f.emoji)} Walk from ${esc(f.name)}</h2>
+      <div class="sumgrid"><div><b>${fmtD(w.dist||0)}</b><span>distance</span></div><div><b>${cells.size-before}</b><span>tiles for you</span></div><div><b>${np}</b><span>photos</span></div></div>
+      <p>Their trail is now on your map in their colour, and the fog it cleared counts for you too.</p>
+      <div class="row"><button class="btn pri" data-a="close">Nice</button></div></div>`);
+  }catch(e){ toast('That shared walk could not be read'); }
+}
 
 /* ================= Boot ================= */
 syncTools(); drawFog(); drawTrails(); renderMarkers(); renderHud();
