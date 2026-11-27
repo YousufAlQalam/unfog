@@ -169,6 +169,15 @@
   #live{cursor:pointer}
   #drawBar{position:absolute;left:10px;right:10px;bottom:calc(var(--navh) + env(safe-area-inset-bottom) + 12px);z-index:1100;padding:10px 12px;display:none}
   #drawBar.show{display:block}
+  #placeBar{position:absolute;left:10px;right:10px;bottom:calc(var(--navh) + env(safe-area-inset-bottom) + 12px);z-index:1100;padding:10px 12px;display:none}
+  #placeBar.show{display:flex;gap:10px;align-items:center}
+  #placeBar img{width:56px;height:56px;border-radius:10px;object-fit:cover;flex:none}
+  #placeBar .t{flex:1;font-size:13px;font-weight:700}#placeBar .t small{display:block;color:var(--muted);font-weight:600;font-size:11px}
+  .wrow{display:flex;gap:10px;align-items:center;justify-content:center}
+  #snapBtn{pointer-events:auto;width:50px;height:50px;border-radius:50%;font-size:22px;display:none;align-items:center;justify-content:center}
+  #snapBtn.show{display:flex}
+  .rph{width:30px;height:30px;border-radius:9px;border:2px solid #fff;background:#3a4146 center/cover no-repeat;box-shadow:0 2px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:13px}
+  .hidephotos .rph{display:none}
   #drawBar .t{font-size:13px;font-weight:700}
   #drawBar .t small{display:block;color:var(--muted);font-weight:600;font-size:11px}
   .dbtns{display:flex;gap:6px;margin-top:8px}.dbtns .btn{padding:9px}
@@ -201,7 +210,12 @@
 
 <div id="walkWrap">
   <div class="glass" id="live"></div>
-  <button id="walkBtn">▶ Start walk</button>
+  <div class="wrow"><button id="walkBtn">▶ Start walk</button><button class="glass" id="snapBtn" title="Photo on route">📷</button></div>
+</div>
+<div class="glass" id="placeBar">
+  <img id="pbImg" alt="">
+  <div class="t" id="pbTxt"></div>
+  <div style="display:flex;flex-direction:column;gap:6px"><button class="btn" id="pbSkip" style="padding:7px 10px;font-size:12px">Skip</button><button class="btn" id="pbEven" style="padding:7px 10px;font-size:12px">Spread rest</button></div>
 </div>
 
 <div class="glass" id="drawBar">
@@ -242,6 +256,8 @@
 <input type="file" id="fileEnv" accept="image/*" capture="environment" hidden>
 <input type="file" id="fileUser" accept="image/*" capture="user" hidden>
 <input type="file" id="fileGal1" accept="image/*" hidden>
+<input type="file" id="fileSnap" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileRoute" accept="image/*" multiple hidden>
 <input type="file" id="fileAlbum" accept="image/*" multiple hidden>
 <input type="file" id="fileImport" accept="application/json,.json,text/plain,.txt,.unfog" hidden>
 
@@ -373,7 +389,8 @@ let friends = LS.get('ud_friends',{});   // id -> {id,name,emoji,color}
 let fwalks  = LS.get('ud_fwalks',[]);    // walks shared by friends {..., from}
 let fshots  = LS.get('ud_fshots',{});    // idbKey -> {pid, from, label, ts}
 let album   = LS.get('ud_album',{});    // idbKey -> {pid, ts}
-let logged  = LS.get('ud_logged',{});   // placeId -> true when visit was logged without GPS
+let logged  = LS.get('ud_logged',{});
+let rphotos = LS.get('ud_rphotos',{});  // idbKey -> {wid, lat, lng, ts, from?}   // placeId -> true when visit was logged without GPS
 let covers  = LS.get('ud_covers',{});    // placeId -> small dataURL from your own shot
 let settings = Object.assign({ fog:true, trails:true }, LS.get('ud_settings',{}));
 const saveCells = debounce(()=>LS.set('ud_cells',[...cells]),1500);
@@ -401,7 +418,7 @@ let toastT; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.
 const places=()=>BASE.concat(custom);
 const placeById=id=>places().find(p=>p.id===id);
 const shotsDone=p=>p.shots.filter((_,i)=>shots[p.id+'#'+i]).length;
-function totalXp(){ let x=cells.size*XP.cell+Object.keys(visits).length*XP.visit+Object.keys(shots).length*XP.shot+Object.keys(album).length*XP.album; for(const p of places()) if(p.shots.length&&shotsDone(p)===p.shots.length) x+=XP.full; return x; }
+function totalXp(){ let x=cells.size*XP.cell+Object.keys(visits).length*XP.visit+Object.keys(shots).length*XP.shot+Object.keys(album).length*XP.album+Object.keys(rphotos).filter(k=>!rphotos[k].from).length*XP.album; for(const p of places()) if(p.shots.length&&shotsDone(p)===p.shots.length) x+=XP.full; return x; }
 function levelInfo(xp){ const need=l=>Math.round(150*Math.pow(l,1.6)); let lv=1,base=0; while(xp>=base+need(lv)){base+=need(lv);lv++;} return {lv,into:xp-base,need:need(lv),title:TITLES[Math.min(lv-1,TITLES.length-1)]}; }
 function totalDist(){ return walks.reduce((s,w)=>s+(w.dist||0),0)+(cur?cur.dist:0); }
 
@@ -447,18 +464,20 @@ const trailLayer=L.layerGroup().addTo(map);
 let liveLine=null, liveGlow=null;
 function lighten(h){ const n=parseInt(h.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255,m=c=>Math.round(c+(255-c)*.45); return '#'+[m(r),m(g),m(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
 function darken(h){ const n=parseInt(h.slice(1),16),f=c=>Math.round(c*.58); return '#'+[f(n>>16),f((n>>8)&255),f(n&255)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
-function lineFor(pts,live,color){
+function lineFor(pts,live,color,onClick){
   const c=color||me.color||'#d6b98c';
-  const glow=L.polyline(pts,{pane:'trails',color:live===true?'#a9d1b2':c,weight:12,opacity:.45,lineCap:'round',lineJoin:'round',interactive:false});
+  const glow=L.polyline(pts,{pane:'trails',color:live===true?'#a9d1b2':c,weight:14,opacity:.45,lineCap:'round',lineJoin:'round',interactive:!!onClick,bubblingMouseEvents:false});
+  if(onClick) glow.on('click',e=>{ L.DomEvent.stop(e); if(drawing) addDrawPt(e.latlng); else if(placing) placeAt(e.latlng); else onClick(); });
   const core=L.polyline(pts,{pane:'trails',color:live===true?'#4f7d5b':darken(c),weight:4,opacity:1,lineCap:'round',lineJoin:'round',interactive:false,dashArray:live===2?'1 9':null});
   return [glow,core];
 }
 function drawTrails(){
   trailLayer.clearLayers(); liveLine=liveGlow=null;
   if(!settings.trails) return;
-  for(const w of fwalks) if(w.pts.length>1){ const f=friends[w.from]; lineFor(w.pts,2,f&&f.color).forEach(l=>l.addTo(trailLayer)); }
-  for(const w of walks) if(w.pts.length>1) lineFor(w.pts).forEach(l=>l.addTo(trailLayer));
+  for(const w of fwalks) if(w.pts.length>1){ const f=friends[w.from]; lineFor(w.pts,2,f&&f.color,()=>openWalk(w.id,w.from)).forEach(l=>l.addTo(trailLayer)); }
+  for(const w of walks) if(w.pts.length>1) lineFor(w.pts,false,null,()=>openWalk(w.id)).forEach(l=>l.addTo(trailLayer));
   if(cur&&cur.pts.length>1){ [liveGlow,liveLine]=lineFor(cur.pts,true); liveGlow.addTo(trailLayer); liveLine.addTo(trailLayer); }
+  renderRouteMarkers();
 }
 
 /* ---- place markers ---- */
@@ -546,7 +565,7 @@ function onFix(pos){
     const d=lp?dist(lp[0],lp[1],lat,lng):Infinity;
     if(!lp||d>=MIN_STEP){
       if(lp&&d<400) cur.dist+=d;
-      cur.pts.push([+lat.toFixed(5),+lng.toFixed(5)]); cur.last=Date.now();
+      cur.pts.push([+lat.toFixed(5),+lng.toFixed(5)]); cur.last=Date.now(); (cur.tms=cur.tms||[]).push(Date.now());
       if(settings.trails){ if(liveLine){ liveLine.addLatLng([lat,lng]); liveGlow.addLatLng([lat,lng]); } else if(cur.pts.length>1) drawTrails(); }
       saveCur();
     }
@@ -574,10 +593,10 @@ function openCompanions(){
 async function startWalk(){
   if(!('geolocation' in navigator)){ toast('No GPS in this browser'); return; }
   if(!window.isSecureContext){ toast('GPS needs an https:// link'); return; }
-  cur={ id:'w'+Date.now(), start:Date.now(), pts:[], dist:0, cells0:cells.size, xp0:totalXp(), visits0:Object.keys(visits).length, shots0:Object.keys(shots).length };
+  cur={ id:'w'+Date.now(), start:Date.now(), pts:[], tms:[], dist:0, cells0:cells.size, xp0:totalXp(), visits0:Object.keys(visits).length, shots0:Object.keys(shots).length };
   follow=true; lastFix=null; setGps('wait','Searching…');
   watchId=navigator.geolocation.watchPosition(onFix,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
-  $('walkBtn').textContent='■ End walk'; $('walkBtn').classList.add('on');
+  $('walkBtn').textContent='■ End walk'; $('walkBtn').classList.add('on'); $('snapBtn').classList.add('show');
   try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
   clearInterval(liveT); liveT=setInterval(renderLive,15000); renderLive();
   toast('Walk started. Keep the app open. 🌙 Dim your screen to save battery.');
@@ -585,7 +604,7 @@ async function startWalk(){
 function stopWalk(silent){
   if(watchId!==null) navigator.geolocation.clearWatch(watchId); watchId=null;
   try{ wake&&wake.release(); }catch(e){} wake=null; clearInterval(liveT);
-  $('walkBtn').textContent='▶ Start walk'; $('walkBtn').classList.remove('on');
+  $('walkBtn').textContent='▶ Start walk'; $('walkBtn').classList.remove('on'); $('snapBtn').classList.remove('show');
   if($('gpsTxt').textContent!=='Denied') setGps('off','GPS off');
   LS.set('ud_cells',[...cells]);
   const w=cur; cur=null; LS.set('ud_curwalk',null); renderLive();
@@ -713,7 +732,12 @@ $('fileEnv').onchange=onPhoto; $('fileUser').onchange=onPhoto; $('fileGal1').onc
 let vList=[], vIdx=0;
 async function openViewer(list,idx){ vList=list; vIdx=idx; await showV(); $('viewer').classList.add('open'); }
 async function showV(){
-  const k=vList[vIdx], fs=fshots[k], al=album[k], [pid0,i]=k.split('#'), pid=fs?fs.pid:al?al.pid:pid0, p=placeById(pid), src=await getPhoto(k);
+  const k=vList[vIdx], rp=rphotos[k];
+  if(rp){ const src=await getPhoto(k); const by=rp.from?` · by ${esc((friends[rp.from]||{}).name||'a friend')}`:'';
+    $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${walkTitle(rp.wid,rp.from)}</b><small>On the route${by} · ${new Date(rp.ts).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>
+     <div class="vnav"><button class="btn" data-v="-1" ${vIdx?'':'disabled'}>‹</button><button class="btn" data-v="x">Close</button><button class="btn" data-v="1" ${vIdx<vList.length-1?'':'disabled'}>›</button></div>
+     <div class="vnav" style="margin-top:8px"><button class="btn" data-v="loc">📍 Show on map</button><button class="btn danger" data-v="del">🗑️ Delete</button></div>`; return; }
+  const fs=fshots[k], al=album[k], [pid0,i]=k.split('#'), pid=fs?fs.pid:al?al.pid:pid0, p=placeById(pid), src=await getPhoto(k);
   const sub=fs?`📸 by ${esc((friends[fs.from]||{}).name||'a friend')} · ${esc(fs.label||'')}`:al?'Album':`${esc(p?p.shots[+i]||'':'')}`;
   const dt=fs?fs.ts:al?al.ts:shots[k];
   $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${esc(p?p.name:'')}</b><small>${sub} · ${dt?new Date(dt).toLocaleDateString():''}</small></div>
@@ -721,6 +745,9 @@ async function showV(){
    <div class="vnav" style="margin-top:8px"><button class="btn danger" data-v="del">🗑️ Delete photo</button></div>`;
 }
 async function deletePhoto(k){
+  if(rphotos[k]){ await delPhoto(k); await delPhoto(k+':t'); delete rphotos[k]; delete thumbCache[k]; LS.set('ud_rphotos',rphotos); renderRouteMarkers(); renderHud();
+    vList.splice(vIdx,1); if(!vList.length) $('viewer').classList.remove('open'); else { vIdx=Math.min(vIdx,vList.length-1); showV(); }
+    if(curPage==='gallery') renderGallery(); toast('Photo deleted'); return; }
   const pid=fshots[k]?fshots[k].pid:album[k]?album[k].pid:k.split('#')[0];
   await delPhoto(k); delete shots[k]; delete album[k]; delete fshots[k];
   LS.set('ud_shots',shots); LS.set('ud_album',album); LS.set('ud_fshots',fshots);
@@ -739,6 +766,7 @@ async function deletePhoto(k){
 }
 $('viewer').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return;
   if(b.dataset.v==='del'){ if(!b.dataset.c){ b.dataset.c=1; b.textContent='Tap again to delete for good'; return; } deletePhoto(vList[vIdx]); return; }
+  if(b.dataset.v==='loc'){ const rp=rphotos[vList[vIdx]]; if(rp){ $('viewer').classList.remove('open'); closeSheet(); go('map'); follow=false; map.setView([rp.lat,rp.lng],18); } return; }
   if(b.dataset.v==='x') $('viewer').classList.remove('open'); else { vIdx=Math.max(0,Math.min(vList.length-1,vIdx+ +b.dataset.v)); showV(); } };
 
 /* ---- add / edit custom place ---- */
@@ -791,6 +819,10 @@ sheet.addEventListener('click',async e=>{
     LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_teasers',teasers);
     renderMarkers(); renderHud(); closeSheet(); toast('Place deleted');
   }
+  else if(a==='wmap'){ const w=findWalk(el.dataset.id,el.dataset.f); if(w){ closeSheet(); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]}); } }
+  else if(a==='wadd'){ pendingRoute=findWalk(el.dataset.id); $('fileRoute').click(); }
+  else if(a==='wshare'){ const w=findWalk(el.dataset.id); w&&shareWalk(w); }
+  else if(a==='wview'){ const ks=walkPhotoKeys(rphotos[el.dataset.k].wid); openViewer(ks,ks.indexOf(el.dataset.k)); }
   else if(a==='shootg'){ const p=placeById(el.dataset.id); p&&shootGal(p,+el.dataset.i); }
   else if(a==='albumadd'){ pendingAlbum=placeById(el.dataset.id); $('fileAlbum').click(); }
   else if(a==='aview'){ const pid=album[el.dataset.k].pid; const ks=Object.keys(album).filter(k=>album[k].pid===pid).sort((x,y)=>album[x].ts-album[y].ts); openViewer(ks,ks.indexOf(el.dataset.k)); }
@@ -840,11 +872,11 @@ $('placeFilters').addEventListener('click',e=>{ const b=e.target.closest('[data-
 $('placeList').addEventListener('click',e=>{ const c=e.target.closest('[data-p]'); if(!c) return; const p=placeById(c.dataset.p); go('map'); follow=false; map.setView([p.lat,p.lng],17); setTimeout(()=>openPlace(p.id),120); });
 
 async function renderGallery(){
-  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]).concat(Object.keys(album).sort((a,b)=>album[b].ts-album[a].ts)).concat(Object.keys(fshots).sort((a,b)=>fshots[b].ts-fshots[a].ts));
+  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]).concat(Object.keys(album).sort((a,b)=>album[b].ts-album[a].ts)).concat(Object.keys(rphotos).sort((a,b)=>rphotos[b].ts-rphotos[a].ts)).concat(Object.keys(fshots).sort((a,b)=>fshots[b].ts-fshots[a].ts));
   if(!keys.length){ $('galBody').innerHTML=`<div class="empty"><b>📷</b>No photos yet.<br>Visit a place and work through its shot list.</div>`; return; }
   const photos=await allPhotos(); const by={};
-  for(const k of keys){ const pid=fshots[k]?fshots[k].pid:album[k]?album[k].pid:k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
-  $('galBody').innerHTML=Object.entries(by).map(([pid,ks])=>{ const p=placeById(pid); return `<div class="galhead">${esc(p?p.name:'Removed place')} · ${ks.length}</div><div class="gal">${ks.map(k=>photos[k]?`<img src="${photos[k]}" data-k="${esc(k)}">`:'').join('')}</div>`; }).join('');
+  for(const k of keys){ const pid=rphotos[k]?'walk:'+rphotos[k].wid:fshots[k]?fshots[k].pid:album[k]?album[k].pid:k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
+  $('galBody').innerHTML=Object.entries(by).map(([pid,ks])=>{ const p=placeById(pid); const head=pid.startsWith('walk:')?walkTitle(pid.slice(5),rphotos[ks[0]].from):esc(p?p.name:'Removed place'); return `<div class="galhead">${head} · ${ks.length}</div><div class="gal">${ks.map(k=>photos[k]?`<img src="${photos[k]}" data-k="${esc(k)}">`:'').join('')}</div>`; }).join('');
   $('galBody').onclick=e=>{ const im=e.target.closest('img[data-k]'); if(im) openViewer(keys,keys.indexOf(im.dataset.k)); };
 }
 
@@ -870,7 +902,7 @@ function renderStats(){
     </div>
     <div class="sec">By category</div>${cats}
     <div class="sec">Recent walks</div>
-    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${w.manual?'✏️ ':''}${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span><button class="lnk" data-ws="${esc(w.id)}" style="margin-right:10px">📤 Share</button><span class="lnk">Map →</span></span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
+    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${w.manual?'✏️ ':''}${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span><button class="lnk" data-ws="${esc(w.id)}" style="margin-right:10px">📤 Share</button><span class="lnk">Open →</span></span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
     <div class="sec">You & friends</div>
     <div class="frow" data-fp="1"><span class="av" style="border-color:${me.color}">${esc(me.emoji)}</span><div class="tx">${esc(me.name||'Set your name')}<small>Your avatar and trail colour · tap to edit</small></div><span class="lnk">Edit</span></div>
     ${Object.values(friends).map(f=>{ const n=fwalks.filter(w=>w.from===f.id).length; return `<div class="frow"><span class="av" style="border-color:${f.color}">${esc(f.emoji)}</span><div class="tx">${esc(f.name)}<small>${n?n+' shared walk'+(n>1?'s':''):'tagged on your walks'}</small></div></div>`; }).join('')}
@@ -881,14 +913,14 @@ function renderStats(){
     <div class="row"><button class="btn" id="bRef">🔄 Refresh place photos</button></div>`;
   $('statsBody').querySelectorAll('[data-ws]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const w=walks.find(x=>x.id===b.dataset.ws); w&&shareWalk(w); });
   $('statsBody').querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>openProfile());
-  $('statsBody').querySelectorAll('[data-w]').forEach(r=>r.onclick=()=>{ const w=walks.find(x=>x.id===r.dataset.w); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]}); });
+  $('statsBody').querySelectorAll('[data-w]').forEach(r=>r.onclick=()=>openWalk(r.dataset.w));
   $('bExp').onclick=exportData; $('bImp').onclick=()=>$('fileImport').click();
   $('bRef').onclick=async()=>{ teasers={}; LS.set('ud_teasers',teasers); toast('Refreshing photos…'); await warmTeasers(); renderMarkers(); toast('Photos refreshed'); };
 }
 
 /* ================= Backup ================= */
 async function exportData(){
-  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,me,friends,fwalks,fshots,covers,album,logged,photos:await allPhotos()};
+  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,me,friends,fwalks,fshots,covers,album,logged,rphotos,photos:await allPhotos()};
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
   a.download='unfog-damascus-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   toast('Backup saved to Downloads');
@@ -903,7 +935,7 @@ async function importData(f){
     for(const k in (p.photos||{})) await putPhoto(k,p.photos[k]);
     if(p.me&&p.me.id===me.id) Object.assign(me,p.me);
     Object.assign(friends,p.friends||{}); for(const w of (p.fwalks||[])) if(!fwalks.find(x=>x.id===w.id&&x.from===w.from)) fwalks.push(w);
-    Object.assign(fshots,p.fshots||{}); Object.assign(covers,p.covers||{}); Object.assign(album,p.album||{}); Object.assign(logged,p.logged||{}); LS.set('ud_album',album); LS.set('ud_logged',logged);
+    Object.assign(fshots,p.fshots||{}); Object.assign(covers,p.covers||{}); Object.assign(album,p.album||{}); Object.assign(logged,p.logged||{}); Object.assign(rphotos,p.rphotos||{}); LS.set('ud_rphotos',rphotos); LS.set('ud_album',album); LS.set('ud_logged',logged);
     LS.set('ud_me',me); LS.set('ud_friends',friends); LS.set('ud_fwalks',fwalks); LS.set('ud_fshots',fshots); LS.set('ud_covers',covers);
     LS.set('ud_cells',[...cells]); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_custom2',custom); LS.set('ud_walks',walks);
     drawFog(); drawTrails(); renderMarkers(); renderHud(); renderStats(); toast('Backup restored');
@@ -988,9 +1020,10 @@ async function shareWalk(w){
   const all=await allPhotos(); const photos={}, meta={};
   for(const k in shots){ if(shots[k]>=w.start&&shots[k]<=(w.end||Date.now())+60000&&all[k]){ photos[k]=all[k]; const [pid,i]=k.split('#'); const p=placeById(pid); meta[k]={pid,label:p?p.shots[+i]:'',ts:shots[k]}; } }
   for(const k in album){ const al=album[k]; const inWin=(al.ts>=w.start&&al.ts<=(w.end||Date.now())+60000)||(w.manual&&w.places&&w.places.includes(al.pid)); if(inWin&&all[k]){ photos[k]=all[k]; meta[k]={pid:al.pid,label:'Album',ts:al.ts}; } }
-  const pids=new Set(Object.values(meta).map(m=>m.pid));
+  for(const k in rphotos){ const rp=rphotos[k]; if(rp.wid===w.id&&!rp.from&&all[k]){ photos[k]=all[k]; meta[k]={route:true,lat:rp.lat,lng:rp.lng,ts:rp.ts}; } }
+  const pids=new Set(Object.values(meta).filter(m=>!m.route).map(m=>m.pid));
   const placesOut=custom.filter(p=>pids.has(p.id));
-  const payload={ app:'unfog-walk', v:1, from:{id:me.id,name:me.name,emoji:me.emoji,color:me.color}, walk:{id:w.id,start:w.start,end:w.end,dist:w.dist,pts:w.pts,with:w.with||[]}, meta, photos, places:placesOut };
+  const payload={ app:'unfog-walk', v:1, from:{id:me.id,name:me.name,emoji:me.emoji,color:me.color}, walk:{id:w.id,start:w.start,end:w.end,dist:w.dist,pts:w.pts,tms:w.tms,manual:w.manual,with:w.with||[]}, meta, photos, places:placesOut };
   const fname=`walk-${me.name.replace(/[^\w؀-ۿ]+/g,'-')}-${new Date(w.start).toISOString().slice(0,10)}`;
   const text=JSON.stringify(payload);
   for(const [ext,type] of [['.json','application/json'],['.txt','text/plain']]){
@@ -1012,8 +1045,9 @@ async function importWalk(p){
     revealPath(w.pts);
     for(const pl of (p.places||[])) if(!placeById(pl.id)) custom.push(Object.assign({},pl,{sharedBy:f.name}));
     let np=0;
-    for(const k in (p.photos||{})){ const nk='f:'+f.id+':'+k; await putPhoto(nk,p.photos[k]); const m=(p.meta||{})[k]||{}; fshots[nk]={pid:m.pid||k.split('#')[0],from:f.id,label:m.label||'',ts:m.ts||w.start}; if(m.pid&&placeById(m.pid)&&!visits[m.pid]){ visits[m.pid]=m.ts||w.start; } np++; }
-    LS.set('ud_friends',friends); LS.set('ud_fwalks',fwalks); LS.set('ud_fshots',fshots); LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_cells',[...cells]);
+    for(const k in (p.photos||{})){ const nk='f:'+f.id+':'+k; await putPhoto(nk,p.photos[k]); const m=(p.meta||{})[k]||{};
+      if(m.route){ rphotos[nk]={wid:w.id,lat:m.lat,lng:m.lng,ts:m.ts||w.start,from:f.id}; try{ await putPhoto(nk+':t',await thumb(p.photos[k])); }catch(e){} np++; continue; } fshots[nk]={pid:m.pid||k.split('#')[0],from:f.id,label:m.label||'',ts:m.ts||w.start}; if(m.pid&&placeById(m.pid)&&!visits[m.pid]){ visits[m.pid]=m.ts||w.start; } np++; }
+    LS.set('ud_rphotos',rphotos); LS.set('ud_friends',friends); LS.set('ud_fwalks',fwalks); LS.set('ud_fshots',fshots); LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_cells',[...cells]);
     drawFog(); drawTrails(); renderMarkers(); renderHud(); if(curPage==='stats') renderStats();
     go('map'); follow=false; if(w.pts.length>1) map.fitBounds(L.latLngBounds(w.pts),{padding:[60,60]});
     openSheet(`<div class="grab"></div><div class="sh"><h2>${esc(f.emoji)} Walk from ${esc(f.name)}</h2>
@@ -1021,6 +1055,140 @@ async function importWalk(p){
       <p>Their trail is now on your map in their colour, and the fog it cleared counts for you too.</p>
       <div class="row"><button class="btn pri" data-a="close">Nice</button></div></div>`);
   }catch(e){ toast('That shared walk could not be read'); }
+}
+
+/* ================= Route photos ================= */
+const rLayer=L.layerGroup().addTo(map);
+const thumbCache={};
+let pendingRoute=null, placing=null;
+function findWalk(id,from){ return from?fwalks.find(w=>w.id===id&&w.from===from):(walks.find(w=>w.id===id)||(cur&&cur.id===id?cur:null)); }
+function walkTitle(wid,from){ const w=findWalk(wid,from); const who=from&&friends[from]?esc(friends[from].emoji+' '+friends[from].name)+' · ':''; return `${who}${w&&w.manual?'✏️ Path':'🚶 Walk'} · ${w?new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}):'unsaved'}`; }
+function walkPhotoKeys(wid){ return Object.keys(rphotos).filter(k=>rphotos[k].wid===wid).sort((a,b)=>rphotos[a].ts-rphotos[b].ts); }
+async function loadThumb(k){ if(thumbCache[k]) return thumbCache[k]; let t=await getPhoto(k+':t'); if(!t){ const full=await getPhoto(k); if(full){ try{ t=await thumb(full); await putPhoto(k+':t',t); }catch(e){} } } if(t) thumbCache[k]=t; return t; }
+function renderRouteMarkers(){
+  rLayer.clearLayers(); if(!settings.trails) return;
+  for(const k in rphotos){ const rp=rphotos[k];
+    const m=L.marker([rp.lat,rp.lng],{icon:L.divIcon({html:`<div class="rph" id="rph-${k.replace(/[^\w-]/g,'_')}">📷</div>`,className:'',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:500}).addTo(rLayer);
+    m.on('click',e=>{ if(drawing) return addDrawPt(e.latlng); if(placing) return placeAt(e.latlng); const ks=walkPhotoKeys(rp.wid); openViewer(ks,ks.indexOf(k)); });
+    loadThumb(k).then(t=>{ const el=document.getElementById('rph-'+k.replace(/[^\w-]/g,'_')); if(el&&t){ el.style.backgroundImage=`url('${t}')`; el.textContent=''; } });
+  }
+}
+map.on('zoomend',()=>$('map').classList.toggle('hidephotos',map.getZoom()<14));
+async function saveRoutePhoto(wid,data,lat,lng,ts){
+  const k='r:'+wid+':'+ts+'_'+Math.random().toString(36).slice(2,6);
+  await putPhoto(k,data); try{ const t=await thumb(data); await putPhoto(k+':t',t); thumbCache[k]=t; }catch(e){}
+  rphotos[k]={wid,lat:+lat.toFixed(6),lng:+lng.toFixed(6),ts}; LS.set('ud_rphotos',rphotos); return k;
+}
+// live snap during a walk
+$('snapBtn').onclick=()=>{ if(!cur) return; $('fileSnap').click(); };
+$('fileSnap').onchange=async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f||!cur) return;
+  const pos=lastPos||cur.pts[cur.pts.length-1]; if(!pos){ toast('Waiting for GPS…'); return; }
+  await saveRoutePhoto(cur.id,await compress(f),pos[0],pos[1],Date.now());
+  renderRouteMarkers(); renderHud(); vibrate(80); toast(`📷 Pinned to your route · +${XP.album} XP`);
+};
+
+/* ---- EXIF: capture time + GPS from the original file ---- */
+async function readExif(file){
+  try{
+    const buf=await file.slice(0,262144).arrayBuffer(), v=new DataView(buf);
+    if(v.getUint16(0)!==0xFFD8) return {};
+    let o=2;
+    while(o<v.byteLength-4){
+      const mk=v.getUint16(o), len=v.getUint16(o+2);
+      if(mk===0xFFE1&&v.getUint32(o+4)===0x45786966){ return parseTiff(v,o+10); }
+      if((mk&0xFF00)!==0xFF00) break; o+=2+len;
+    }
+  }catch(e){}
+  return {};
+}
+function parseTiff(v,t){
+  const le=v.getUint16(t)===0x4949, u16=x=>v.getUint16(x,le), u32=x=>v.getUint32(x,le);
+  const ifd=(off)=>{ const n=u16(t+off), out={}; for(let i=0;i<n;i++){ const e=t+off+2+i*12; out[u16(e)]={type:u16(e+2),count:u32(e+4),val:e+8}; } return out; };
+  const str=en=>{ const p=en.count>4?t+u32(en.val):en.val; let s=''; for(let i=0;i<en.count-1;i++) s+=String.fromCharCode(v.getUint8(p+i)); return s; };
+  const rats=en=>{ const p=t+u32(en.val), r=[]; for(let i=0;i<en.count;i++) r.push(u32(p+i*8)/(u32(p+i*8+4)||1)); return r; };
+  const res={}; const i0=ifd(u32(t+4));
+  if(i0[0x8769]){ const ex=ifd(u32(i0[0x8769].val)); const d=ex[0x9003]||ex[0x9004]; if(d){ const m=str(d).match(/(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)/); if(m) res.ts=new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime(); } }
+  if(i0[0x8825]){ const g=ifd(u32(i0[0x8825].val)); if(g[2]&&g[4]){ const la=rats(g[2]), lo=rats(g[4]); let lat=la[0]+la[1]/60+la[2]/3600, lng=lo[0]+lo[1]/60+lo[2]/3600;
+    if(g[1]&&String.fromCharCode(v.getUint8(g[1].val))==='S') lat=-lat; if(g[3]&&String.fromCharCode(v.getUint8(g[3].val))==='W') lng=-lng; if(lat||lng){ res.lat=lat; res.lng=lng; } } }
+  return res;
+}
+function nearestOnPath(pts,lat,lng){
+  const k=Math.cos(lat*Math.PI/180); let best=null,bd=Infinity;
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[i+1]||pts[i];
+    const ax=a[1]*k, ay=a[0], bx=b[1]*k, by=b[0], px=lng*k, py=lat;
+    const dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy; let tt=L2?((px-ax)*dx+(py-ay)*dy)/L2:0; tt=Math.max(0,Math.min(1,tt));
+    const q=[ay+dy*tt,(ax+dx*tt)/k], d=dist(lat,lng,q[0],q[1]); if(d<bd){ bd=d; best=q; }
+  }
+  return {pt:best,d:bd};
+}
+function posAtTime(w,T){
+  if(!w.tms||w.tms.length!==w.pts.length||!T) return null;
+  const t0=w.tms[0], t1=w.tms[w.tms.length-1];
+  if(T<t0-10*60000||T>t1+10*60000) return null;
+  if(T<=t0) return w.pts[0]; if(T>=t1) return w.pts[w.pts.length-1];
+  for(let i=1;i<w.tms.length;i++) if(w.tms[i]>=T){ const f=(T-w.tms[i-1])/((w.tms[i]-w.tms[i-1])||1), a=w.pts[i-1], b=w.pts[i]; return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]; }
+  return null;
+}
+function pathAt(pts,frac){ // point at fraction of the route's length
+  let total=0; const seg=[]; for(let i=1;i<pts.length;i++){ const d=dist(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]); seg.push(d); total+=d; }
+  let target=total*frac; for(let i=0;i<seg.length;i++){ if(target<=seg[i]){ const f=seg[i]?target/seg[i]:0, a=pts[i], b=pts[i+1]; return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]; } target-=seg[i]; }
+  return pts[pts.length-1];
+}
+$('fileRoute').onchange=async e=>{
+  const fs=[...(e.target.files||[])]; e.target.value=''; const w=pendingRoute; pendingRoute=null; if(!fs.length||!w) return;
+  toast(`Placing ${fs.length} photo${fs.length>1?'s':''}…`);
+  let auto=0; const manual=[];
+  for(const f of fs){
+    try{
+      const ex=await readExif(f), data=await compress(f);
+      let pos=null, how='';
+      if(ex.lat!=null){ const n=nearestOnPath(w.pts,ex.lat,ex.lng); if(n.d<500){ pos=[ex.lat,ex.lng]; how='gps'; } }
+      if(!pos&&ex.ts){ const q=posAtTime(w,ex.ts); if(q){ pos=q; how='time'; } }
+      if(pos){ await saveRoutePhoto(w.id,data,pos[0],pos[1],ex.ts||Date.now()); auto++; }
+      else manual.push({data,ts:ex.ts||w.start,thumb:await thumb(data)});
+    }catch(err){}
+  }
+  renderRouteMarkers(); renderHud();
+  if(manual.length){ startPlacing(w,manual,auto); }
+  else { toast(`📷 ${auto} photo${auto===1?'':'s'} placed on the route · +${auto*XP.album} XP`); openWalk(w.id); }
+};
+function startPlacing(w,queue,auto){
+  placing={w,queue,auto,placed:0}; closeSheet(); go('map'); follow=false; map.fitBounds(L.latLngBounds(w.pts),{padding:[70,70]});
+  $('walkWrap').style.display='none'; $('placeBar').classList.add('show'); showPlacing();
+}
+function showPlacing(){
+  const P=placing; if(!P) return; const it=P.queue[0];
+  if(!it){ endPlacing(); return; }
+  $('pbImg').src=it.thumb;
+  $('pbTxt').innerHTML=`Tap where on the route you took this<small>${P.queue.length} left · it snaps to your trail</small>`;
+}
+async function placeAt(ll){
+  const P=placing; if(!P||!P.queue.length) return;
+  const n=nearestOnPath(P.w.pts,ll.lat,ll.lng), it=P.queue.shift();
+  await saveRoutePhoto(P.w.id,it.data,n.pt[0],n.pt[1],it.ts); P.placed++; renderRouteMarkers(); vibrate(40); showPlacing();
+}
+map.on('click',e=>{ if(placing) placeAt(e.latlng); });
+$('pbSkip').onclick=async()=>{ const P=placing; if(!P) return; const it=P.queue.shift(); const end=P.w.pts[P.w.pts.length-1]; await saveRoutePhoto(P.w.id,it.data,end[0],end[1],it.ts); P.placed++; renderRouteMarkers(); showPlacing(); };
+$('pbEven').onclick=async()=>{ const P=placing; if(!P) return; const n=P.queue.length; for(let i=0;i<n;i++){ const it=P.queue.shift(); const pt=pathAt(P.w.pts,(i+1)/(n+1)); await saveRoutePhoto(P.w.id,it.data,pt[0],pt[1],it.ts); P.placed++; } renderRouteMarkers(); showPlacing(); };
+function endPlacing(){ const P=placing; placing=null; $('placeBar').classList.remove('show'); $('walkWrap').style.display=''; renderHud();
+  if(P){ const n=P.auto+P.placed; toast(`📷 ${n} photo${n===1?'':'s'} on the route · +${n*XP.album} XP`); } }
+
+async function openWalk(id,from){
+  const w=findWalk(id,from); if(!w) return;
+  const ks=walkPhotoKeys(w.id).filter(k=>(rphotos[k].from||null)===(from||null));
+  const ths=await Promise.all(ks.map(k=>loadThumb(k)));
+  const mine=!from;
+  openSheet(`<div class="grab"></div><div class="sh">
+    <h2>${walkTitle(w.id,from)}</h2>
+    <div class="sumgrid"><div><b>${fmtD(w.dist||0)}</b><span>distance</span></div><div><b>${fmtT((w.end||Date.now())-w.start)}</b><span>${w.manual?'est. time':'time'}</span></div><div><b>${ks.length}</b><span>photos</span></div></div>
+    ${w.with&&w.with.length?`<p>👥 With ${w.with.map(x=>esc(x.emoji+' '+x.name)).join(', ')}</p>`:''}
+    ${ks.length?`<div class="sec">📷 On this route</div><div class="fstrip">${ks.map((k,i)=>ths[i]?`<img src="${ths[i]}" data-a="wview" data-k="${esc(k)}">`:'').join('')}</div>`
+      :mine?`<p style="color:var(--muted);font-size:13px">No photos yet. Add the ones you took along the way. They're placed on the route by their GPS or time, or you tap the spot.</p>`:''}
+    <div class="row"><button class="btn" data-a="wmap" data-id="${esc(w.id)}" ${from?`data-f="${esc(from)}"`:''}>🗺️ Show on map</button>${mine?`<button class="btn pri" data-a="wadd" data-id="${esc(w.id)}">➕ Add photos</button>`:''}</div>
+    ${mine?`<div class="row"><button class="btn" data-a="wshare" data-id="${esc(w.id)}">📤 Share walk</button><button class="btn" data-a="close">Close</button></div>`:`<div class="row"><button class="btn" data-a="close">Close</button></div>`}
+  </div>`);
 }
 
 /* ================= Log a past visit ================= */
