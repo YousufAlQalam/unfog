@@ -717,9 +717,29 @@ async function showV(){
   const sub=fs?`📸 by ${esc((friends[fs.from]||{}).name||'a friend')} · ${esc(fs.label||'')}`:al?'Album':`${esc(p?p.shots[+i]||'':'')}`;
   const dt=fs?fs.ts:al?al.ts:shots[k];
   $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${esc(p?p.name:'')}</b><small>${sub} · ${dt?new Date(dt).toLocaleDateString():''}</small></div>
-   <div class="vnav"><button class="btn" data-v="-1" ${vIdx?'':'disabled'}>‹</button><button class="btn" data-v="x">Close</button><button class="btn" data-v="1" ${vIdx<vList.length-1?'':'disabled'}>›</button></div>`;
+   <div class="vnav"><button class="btn" data-v="-1" ${vIdx?'':'disabled'}>‹</button><button class="btn" data-v="x">Close</button><button class="btn" data-v="1" ${vIdx<vList.length-1?'':'disabled'}>›</button></div>
+   <div class="vnav" style="margin-top:8px"><button class="btn danger" data-v="del">🗑️ Delete photo</button></div>`;
 }
-$('viewer').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; if(b.dataset.v==='x') $('viewer').classList.remove('open'); else { vIdx=Math.max(0,Math.min(vList.length-1,vIdx+ +b.dataset.v)); showV(); } };
+async function deletePhoto(k){
+  const pid=fshots[k]?fshots[k].pid:album[k]?album[k].pid:k.split('#')[0];
+  await delPhoto(k); delete shots[k]; delete album[k]; delete fshots[k];
+  LS.set('ud_shots',shots); LS.set('ud_album',album); LS.set('ud_fshots',fshots);
+  // rebuild the cover from whatever photos are left for this place
+  delete covers[pid];
+  const left=Object.keys(shots).filter(x=>x.startsWith(pid+'#')).concat(Object.keys(album).filter(x=>album[x].pid===pid));
+  if(left.length){ const src=await getPhoto(left[0]); if(src){ try{ covers[pid]=await thumb(src); }catch(e){} } }
+  LS.set('ud_covers',covers);
+  renderMarkers(); renderHud();
+  vList.splice(vIdx,1);
+  if(!vList.length){ $('viewer').classList.remove('open'); }
+  else { vIdx=Math.min(vIdx,vList.length-1); showV(); }
+  if(curPage==='gallery') renderGallery();
+  if(sheet.classList.contains('open')&&placeById(pid)) openPlace(pid);
+  toast('Photo deleted');
+}
+$('viewer').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return;
+  if(b.dataset.v==='del'){ if(!b.dataset.c){ b.dataset.c=1; b.textContent='Tap again to delete for good'; return; } deletePhoto(vList[vIdx]); return; }
+  if(b.dataset.v==='x') $('viewer').classList.remove('open'); else { vIdx=Math.max(0,Math.min(vList.length-1,vIdx+ +b.dataset.v)); showV(); } };
 
 /* ---- add / edit custom place ---- */
 let draft=null;
