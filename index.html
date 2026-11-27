@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0e1424">
+<meta name="theme-color" content="#1d2124">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Unfog Damascus</title>
@@ -13,27 +13,27 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
-    --bg:#0e1424; --panel:#161e33; --panel2:#1d2742; --line:rgba(255,255,255,.08);
-    --gold:#f2c66d; --gold2:#ffdf9a; --text:#eef1f8; --muted:#97a2bd; --ok:#5fd38d; --bad:#ff8a8a;
+    --bg:#1d2124; --panel:#262b2f; --panel2:#2f3539; --line:rgba(255,255,255,.07);
+    --gold:#d6b98c; --gold2:#e8d3ae; --text:#ece8e1; --muted:#9a9e9c; --ok:#8fbf9a; --bad:#d98f84;
     --navh:64px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Cairo,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
   button{font:inherit;border:none;cursor:pointer;color:inherit;background:none}
-  #map{position:absolute;inset:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom));background:#1a2236}
-  .leaflet-control-attribution{background:rgba(14,20,36,.6)!important;color:#9aa!important;font-size:9px}
+  #map{position:absolute;inset:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom));background:#23282b}
+  .leaflet-control-attribution{background:rgba(29,33,36,.6)!important;color:#9aa!important;font-size:9px}
   .leaflet-control-attribution a{color:#cdd!important}
 
   /* top HUD */
   #hud{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;z-index:1000;display:flex;gap:8px;pointer-events:none}
-  .glass{background:rgba(22,30,51,.88);border:1px solid rgba(242,198,109,.22);border-radius:16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:auto}
+  .glass{background:rgba(38,43,47,.92);border:1px solid rgba(214,185,140,.22);border-radius:16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:auto}
   #lvl{flex:1;padding:7px 12px}
   #lvlTitle{font-weight:800;color:var(--gold);font-size:14px;line-height:1.2}
   #lvlSub{font-size:11px;color:var(--muted)}
-  #bar{height:5px;background:#26304b;border-radius:3px;margin-top:4px;overflow:hidden}
-  #bar>div{height:100%;width:0;background:linear-gradient(90deg,#c4902f,var(--gold2));transition:width .5s}
+  #bar{height:5px;background:#353b3f;border-radius:3px;margin-top:4px;overflow:hidden}
+  #bar>div{height:100%;width:0;background:linear-gradient(90deg,#a8875a,var(--gold2));transition:width .5s}
   #gps{padding:7px 10px;font-size:11px;display:flex;align-items:center;gap:5px;white-space:nowrap}
-  #gps i{width:9px;height:9px;border-radius:50%;background:#667;display:inline-block}
+  #gps i{width:9px;height:9px;border-radius:50%;background:#6b7073;display:inline-block}
 
   /* right tools */
   #tools{position:absolute;right:10px;top:calc(env(safe-area-inset-top) + 72px);z-index:1000;display:flex;flex-direction:column;gap:8px}
@@ -42,13 +42,13 @@
 
   /* walk button + live chip */
   #walkWrap{position:absolute;left:0;right:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom) + 14px);z-index:1000;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
-  #walkBtn{pointer-events:auto;background:linear-gradient(135deg,#ffd77e,#e8a93a);color:#2a1a02;font-weight:800;font-size:15px;padding:13px 26px;border-radius:30px;box-shadow:0 8px 24px rgba(232,169,58,.35)}
-  #walkBtn.on{background:linear-gradient(135deg,#7ff0aa,#3fbf75);color:#04210f;box-shadow:0 8px 24px rgba(95,211,141,.35)}
+  #walkBtn{pointer-events:auto;background:linear-gradient(135deg,#e6cfa6,#c9a46c);color:#2b2214;font-weight:800;font-size:15px;padding:13px 26px;border-radius:30px;box-shadow:0 8px 24px rgba(201,164,108,.28)}
+  #walkBtn.on{background:linear-gradient(135deg,#b9dcc1,#7fae8b);color:#13261a;box-shadow:0 8px 24px rgba(143,191,154,.28)}
   #live{pointer-events:auto;display:none;padding:6px 14px;font-size:12px;font-weight:700}
   #live.show{display:block}
 
   /* bottom nav */
-  #nav{position:absolute;left:0;right:0;bottom:0;height:calc(var(--navh) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:#11182b;border-top:1px solid var(--line);display:flex;z-index:1500}
+  #nav{position:absolute;left:0;right:0;bottom:0;height:calc(var(--navh) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:#1a1e21;border-top:1px solid var(--line);display:flex;z-index:1500}
   #nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;color:var(--muted);font-weight:600}
   #nav button b{font-size:21px;font-weight:400;filter:grayscale(.6);opacity:.8}
   #nav button.act{color:var(--gold)}
@@ -61,16 +61,16 @@
   .page .lead{color:var(--muted);font-size:13px;margin:0 0 14px}
   .chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
   .chip{padding:6px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--line);font-size:12px;white-space:nowrap;font-weight:600}
-  .chip.act{background:var(--gold);color:#2a1a02;border-color:var(--gold)}
+  .chip.act{background:var(--gold);color:#2b2214;border-color:var(--gold)}
 
   .pcard{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px;margin-bottom:10px;align-items:center}
-  .pcard .th{width:74px;height:74px;border-radius:12px;flex:none;background:#25304d center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:28px;position:relative}
-  .pcard .th .ok{position:absolute;right:-4px;top:-4px;background:var(--ok);color:#04210f;border-radius:50%;width:22px;height:22px;font-size:13px;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .pcard .th{width:74px;height:74px;border-radius:12px;flex:none;background:#343a3e center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:28px;position:relative}
+  .pcard .th .ok{position:absolute;right:-4px;top:-4px;background:var(--ok);color:#13261a;border-radius:50%;width:22px;height:22px;font-size:13px;display:flex;align-items:center;justify-content:center;font-weight:800}
   .pcard .tx{flex:1;min-width:0}
   .pcard .nm{font-weight:700;font-size:15px;line-height:1.25}
   .pcard .ar{font-size:12px;color:var(--muted)}
   .pcard .meta{font-size:11px;color:var(--muted);margin-top:3px}
-  .prog{height:4px;background:#26304b;border-radius:2px;margin-top:6px;overflow:hidden}
+  .prog{height:4px;background:#353b3f;border-radius:2px;margin-top:6px;overflow:hidden}
   .prog>div{height:100%;background:var(--gold)}
 
   /* stats */
@@ -82,7 +82,7 @@
   .tile .v{font-size:22px;font-weight:800}
   .tile .k{font-size:11px;color:var(--muted)}
   .catrow{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:13px}
-  .catrow .cb{flex:1;height:8px;background:#26304b;border-radius:4px;overflow:hidden}
+  .catrow .cb{flex:1;height:8px;background:#353b3f;border-radius:4px;overflow:hidden}
   .catrow .cb>div{height:100%}
   .sec{font-size:15px;font-weight:800;margin:18px 0 8px}
   .walkrow{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:6px;font-size:13px}
@@ -100,7 +100,7 @@
   #scrim.open{display:block}
   #sheet{position:absolute;left:0;right:0;bottom:0;z-index:3000;background:var(--panel);border-radius:22px 22px 0 0;max-height:88vh;overflow-y:auto;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);box-shadow:0 -12px 40px rgba(0,0,0,.6);padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
   #sheet.open{transform:none}
-  .grab{width:40px;height:4px;border-radius:2px;background:#3a4566;margin:8px auto 0}
+  .grab{width:40px;height:4px;border-radius:2px;background:#454c51;margin:8px auto 0}
   .sh{padding:12px 16px 0}
   .sh h2{margin:0;font-size:20px;font-weight:800;line-height:1.2}
   .sh .ar{color:var(--muted);font-size:15px;direction:rtl;text-align:left}
@@ -108,26 +108,26 @@
   .badges{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
   .badge{font-size:12px;padding:4px 10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-weight:600}
   .carousel{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 16px;margin-top:10px}
-  .carousel img{height:190px;border-radius:14px;scroll-snap-align:center;flex:none;max-width:85%;object-fit:cover;background:#25304d}
+  .carousel img{height:190px;border-radius:14px;scroll-snap-align:center;flex:none;max-width:85%;object-fit:cover;background:#343a3e}
   .hero{height:150px;margin:10px 16px 0;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:56px}
   .shot{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--panel2);margin:6px 0}
-  .shot .ck{width:26px;height:26px;border-radius:50%;border:2px solid #4a5677;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px}
-  .shot.done .ck{background:var(--ok);border-color:var(--ok);color:#04210f;font-weight:800}
+  .shot .ck{width:26px;height:26px;border-radius:50%;border:2px solid #5a6166;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .shot.done .ck{background:var(--ok);border-color:var(--ok);color:#13261a;font-weight:800}
   .shot .t{flex:1;font-size:13px}
   .shot img{width:44px;height:44px;border-radius:8px;object-fit:cover}
-  .shot button{background:var(--gold);color:#2a1a02;font-weight:800;padding:7px 10px;border-radius:10px;font-size:12px}
-  .shot button:disabled{background:#3a4566;color:#8a94ad}
-  .tip{background:rgba(242,198,109,.08);border:1px solid rgba(242,198,109,.25);border-radius:12px;padding:10px 12px;font-size:13px;margin:10px 0;line-height:1.55}
+  .shot button{background:var(--gold);color:#2b2214;font-weight:800;padding:7px 10px;border-radius:10px;font-size:12px}
+  .shot button:disabled{background:#454c51;color:#8d9295}
+  .tip{background:rgba(214,185,140,.08);border:1px solid rgba(214,185,140,.25);border-radius:12px;padding:10px 12px;font-size:13px;margin:10px 0;line-height:1.55}
   .row{display:flex;gap:8px;margin-top:12px}
   .btn{flex:1;padding:12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);font-weight:700;font-size:14px;text-align:center;text-decoration:none;color:var(--text);display:block}
-  .btn.pri{background:var(--gold);color:#2a1a02;border-color:var(--gold)}
+  .btn.pri{background:var(--gold);color:#2b2214;border-color:var(--gold)}
   .btn.danger{color:var(--bad)}
   .lnk{color:var(--gold);font-size:13px;text-decoration:none;font-weight:600}
   label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:600}
-  input.f,select.f{width:100%;background:#0f1628;border:1px solid #2d3858;color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;font-size:15px}
+  input.f,select.f{width:100%;background:#1a1e21;border:1px solid #3a4146;color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;font-size:15px}
   .seg{display:flex;gap:6px;flex-wrap:wrap}
-  .seg button{padding:7px 11px;border-radius:12px;background:#0f1628;border:1px solid #2d3858;font-size:13px}
-  .seg button.act{background:var(--gold);color:#2a1a02;border-color:var(--gold);font-weight:700}
+  .seg button{padding:7px 11px;border-radius:12px;background:#1a1e21;border:1px solid #3a4146;font-size:13px}
+  .seg button.act{background:var(--gold);color:#2b2214;border-color:var(--gold);font-weight:700}
 
   /* summary */
   .sumgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
@@ -144,29 +144,38 @@
   #viewer .vnav{display:flex;gap:10px;margin-top:14px;width:100%;max-width:360px}
 
   /* toast */
-  #toast{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 74px);transform:translate(-50%,-16px);z-index:5000;background:var(--gold);color:#2a1a02;font-weight:800;padding:10px 16px;border-radius:14px;opacity:0;transition:all .35s;pointer-events:none;text-align:center;max-width:88%;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  #toast{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 74px);transform:translate(-50%,-16px);z-index:5000;background:var(--gold);color:#2b2214;font-weight:800;padding:10px 16px;border-radius:14px;opacity:0;transition:all .35s;pointer-events:none;text-align:center;max-width:88%;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   #toast.show{opacity:1;transform:translate(-50%,0)}
 
   /* markers */
   .pin{display:flex;flex-direction:column;align-items:center}
-  .pin .c{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:#1a2340 center/cover;border:2.5px solid var(--gold);box-shadow:0 3px 10px rgba(0,0,0,.5);position:relative}
-  .pin.done .c{border-color:var(--ok);box-shadow:0 0 0 3px rgba(95,211,141,.35),0 3px 10px rgba(0,0,0,.5)}
-  .pin.done .c:after{content:"✓";position:absolute;right:-5px;bottom:-3px;background:var(--ok);color:#04210f;font-size:10px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .pin .c{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:#2a2f33 center/cover;border:2.5px solid var(--gold);box-shadow:0 3px 10px rgba(0,0,0,.5);position:relative}
+  .pin.done .c{border-color:var(--ok);box-shadow:0 0 0 3px rgba(143,191,154,.35),0 3px 10px rgba(0,0,0,.5)}
+  .pin.done .c:after{content:"✓";position:absolute;right:-5px;bottom:-3px;background:var(--ok);color:#13261a;font-size:10px;font-weight:900;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
   .pin.near .c{animation:pulse 1.3s infinite}
-  .pin .l{margin-top:3px;font-size:11px;font-weight:700;color:#fff;background:rgba(14,20,36,.82);padding:1px 7px;border-radius:8px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+  .pin .l{margin-top:3px;font-size:11px;font-weight:700;color:#fff;background:rgba(29,33,36,.82);padding:1px 7px;border-radius:8px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
   .hidelabels .pin .l{display:none}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(242,198,109,.9)}100%{box-shadow:0 0 0 18px rgba(242,198,109,0)}}
-  .av{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex:none;border:2.5px solid var(--gold);background:#1a2340}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(214,185,140,.9)}100%{box-shadow:0 0 0 18px rgba(214,185,140,0)}}
+  .av{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex:none;border:2.5px solid var(--gold);background:#2a2f33}
   .frow{display:flex;align-items:center;gap:10px;padding:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:8px}
   .frow .tx{flex:1;font-size:14px}.frow small{display:block;color:var(--muted);font-size:11px}
   .sbox{display:flex;gap:8px;align-items:center}
   .sres{display:flex;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}
   .sres .ic{width:34px;height:34px;border-radius:10px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
   .sres .tx{flex:1;min-width:0;font-size:14px}.sres small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  textarea.f{width:100%;background:#0f1628;border:1px solid #2d3858;color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;font-size:14px;min-height:80px;resize:vertical}
+  textarea.f{width:100%;background:#1a1e21;border:1px solid #3a4146;color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;font-size:14px;min-height:80px;resize:vertical}
   .fstrip{display:flex;gap:6px;overflow-x:auto;margin:6px 0}
   .fstrip img{width:70px;height:70px;border-radius:10px;object-fit:cover;flex:none}
   #live{cursor:pointer}
+  #drawBar{position:absolute;left:10px;right:10px;bottom:calc(var(--navh) + env(safe-area-inset-bottom) + 12px);z-index:1100;padding:10px 12px;display:none}
+  #drawBar.show{display:block}
+  #drawBar .t{font-size:13px;font-weight:700}
+  #drawBar .t small{display:block;color:var(--muted);font-weight:600;font-size:11px}
+  .dbtns{display:flex;gap:6px;margin-top:8px}.dbtns .btn{padding:9px}
+  .logcard{background:rgba(214,185,140,.08);border:1px dashed rgba(214,185,140,.4);border-radius:14px;padding:12px;margin:10px 0}
+  .logcard b{display:block;font-size:14px}.logcard span{font-size:12px;color:var(--muted)}
+  .shot .g{background:var(--panel);color:var(--text);border:1px solid var(--line)}
+  input[type=date].f{color-scheme:dark}
   .me{width:20px;height:20px;border-radius:50%;background:#4ea3ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(78,163,255,.25)}
 </style>
 </head>
@@ -186,12 +195,18 @@
   <button class="glass tool" id="tSearch" title="Search">🔍</button>
   <button class="glass tool" id="tFog" title="Fog">🌫️</button>
   <button class="glass tool" id="tTrail" title="Trails">〰️</button>
+  <button class="glass tool" id="tDraw" title="Draw a path">✏️</button>
   <button class="glass tool" id="tMe" title="Center on me">📍</button>
 </div>
 
 <div id="walkWrap">
   <div class="glass" id="live"></div>
   <button id="walkBtn">▶ Start walk</button>
+</div>
+
+<div class="glass" id="drawBar">
+  <div class="t" id="drawTxt">✏️ Tap along the streets you took<small>Each tap adds a point. Follow the streets, not straight across blocks.</small></div>
+  <div class="dbtns"><button class="btn" id="dUndo">↶ Undo</button><button class="btn" id="dCancel">Cancel</button><button class="btn pri" id="dSave">Save path</button></div>
 </div>
 
 <!-- pages -->
@@ -226,6 +241,8 @@
 
 <input type="file" id="fileEnv" accept="image/*" capture="environment" hidden>
 <input type="file" id="fileUser" accept="image/*" capture="user" hidden>
+<input type="file" id="fileGal1" accept="image/*" hidden>
+<input type="file" id="fileAlbum" accept="image/*" multiple hidden>
 <input type="file" id="fileImport" accept="application/json,.json,text/plain,.txt,.unfog" hidden>
 
 <script>
@@ -238,18 +255,18 @@ const REVEAL_M = 45;       // fog cleared around you
 const NEAR_M = 150;        // how close to take a place's shots
 const MAX_ACC = 60;        // ignore fixes worse than this
 const MIN_STEP = 8;        // metres between trail points
-const XP = { cell:1, visit:50, shot:20, full:40 };
+const XP = { cell:1, visit:50, shot:20, full:40, album:5 };
 const START = [33.5110, 36.3050];
 
 const CATS = {
-  heritage:{ n:'Heritage', ic:'🏛️', c:'#f2c66d' },
-  faith:   { n:'Faith',    ic:'🕌', c:'#7fb3ff' },
-  souq:    { n:'Souqs',    ic:'🛍️', c:'#f08a5d' },
-  quarter: { n:'Quarters', ic:'🏘️', c:'#c49bff' },
-  food:    { n:'Food',     ic:'🍽️', c:'#ff7a9c' },
-  views:   { n:'Views',    ic:'⛰️', c:'#8fd18f' },
-  parks:   { n:'Parks',    ic:'🌳', c:'#5fd38d' },
-  mine:    { n:'My spots', ic:'⭐', c:'#ffdf9a' }
+  heritage:{ n:'Heritage', ic:'🏛️', c:'#d6b98c' },
+  faith:   { n:'Faith',    ic:'🕌', c:'#8fa9c4' },
+  souq:    { n:'Souqs',    ic:'🛍️', c:'#d49a85' },
+  quarter: { n:'Quarters', ic:'🏘️', c:'#a99cc4' },
+  food:    { n:'Food',     ic:'🍽️', c:'#c79aa8' },
+  views:   { n:'Views',    ic:'⛰️', c:'#9fbf8f' },
+  parks:   { n:'Parks',    ic:'🌳', c:'#86b5ab' },
+  mine:    { n:'My spots', ic:'⭐', c:'#e0cfa8' }
 };
 const TIMES = { day:'☀️ Daytime', sunset:'🌅 Golden hour', night:'🌙 Night', any:'🕐 Anytime' };
 const TITLES = ['Stranger','Passer-by','Wanderer','Explorer','Pathfinder','Alley Runner','Old City Ranger','Cartographer','Ibn Battuta Jr.','Shaykh al-Hara'];
@@ -351,10 +368,12 @@ let custom = LS.get('ud_custom2',[]);
 let walks  = LS.get('ud_walks',[]);
 let teasers= LS.get('ud_teasers',{});  // placeId -> {photos:[], extract, url}
 let me = LS.get('ud_me',null);
-if(!me){ me={ id:'u'+Math.random().toString(36).slice(2,10), name:'', emoji:'🧭', color:'#ffd77e' }; LS.set('ud_me',me); }
+if(!me){ me={ id:'u'+Math.random().toString(36).slice(2,10), name:'', emoji:'🧭', color:'#d6b98c' }; LS.set('ud_me',me); }
 let friends = LS.get('ud_friends',{});   // id -> {id,name,emoji,color}
 let fwalks  = LS.get('ud_fwalks',[]);    // walks shared by friends {..., from}
 let fshots  = LS.get('ud_fshots',{});    // idbKey -> {pid, from, label, ts}
+let album   = LS.get('ud_album',{});    // idbKey -> {pid, ts}
+let logged  = LS.get('ud_logged',{});   // placeId -> true when visit was logged without GPS
 let covers  = LS.get('ud_covers',{});    // placeId -> small dataURL from your own shot
 let settings = Object.assign({ fog:true, trails:true }, LS.get('ud_settings',{}));
 const saveCells = debounce(()=>LS.set('ud_cells',[...cells]),1500);
@@ -382,7 +401,7 @@ let toastT; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.
 const places=()=>BASE.concat(custom);
 const placeById=id=>places().find(p=>p.id===id);
 const shotsDone=p=>p.shots.filter((_,i)=>shots[p.id+'#'+i]).length;
-function totalXp(){ let x=cells.size*XP.cell+Object.keys(visits).length*XP.visit+Object.keys(shots).length*XP.shot; for(const p of places()) if(p.shots.length&&shotsDone(p)===p.shots.length) x+=XP.full; return x; }
+function totalXp(){ let x=cells.size*XP.cell+Object.keys(visits).length*XP.visit+Object.keys(shots).length*XP.shot+Object.keys(album).length*XP.album; for(const p of places()) if(p.shots.length&&shotsDone(p)===p.shots.length) x+=XP.full; return x; }
 function levelInfo(xp){ const need=l=>Math.round(150*Math.pow(l,1.6)); let lv=1,base=0; while(xp>=base+need(lv)){base+=need(lv);lv++;} return {lv,into:xp-base,need:need(lv),title:TITLES[Math.min(lv-1,TITLES.length-1)]}; }
 function totalDist(){ return walks.reduce((s,w)=>s+(w.dist||0),0)+(cur?cur.dist:0); }
 
@@ -401,7 +420,7 @@ const brush=(()=>{ const c=document.createElement('canvas'); c.width=c.height=12
 const clouds=(()=>{ // soft cloud texture, tileable-ish
   const c=document.createElement('canvas'); c.width=c.height=512; const g=c.getContext('2d');
   let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; };
-  for(let i=0;i<70;i++){ const x=rnd()*512,y=rnd()*512,r=40+rnd()*110; for(const dx of [-512,0,512]) for(const dy of [-512,0,512]){ const gr=g.createRadialGradient(x+dx,y+dy,0,x+dx,y+dy,r); const a=.05+rnd()*.07; gr.addColorStop(0,`rgba(190,205,240,${a})`); gr.addColorStop(1,'rgba(190,205,240,0)'); g.fillStyle=gr; g.fillRect(x+dx-r,y+dy-r,r*2,r*2);} }
+  for(let i=0;i<70;i++){ const x=rnd()*512,y=rnd()*512,r=40+rnd()*110; for(const dx of [-512,0,512]) for(const dy of [-512,0,512]){ const gr=g.createRadialGradient(x+dx,y+dy,0,x+dx,y+dy,r); const a=.05+rnd()*.07; gr.addColorStop(0,`rgba(232,226,214,${a})`); gr.addColorStop(1,'rgba(232,226,214,0)'); g.fillStyle=gr; g.fillRect(x+dx-r,y+dy-r,r*2,r*2);} }
   return c; })();
 function drawFog(){
   const size=map.getSize(), dpr=Math.min(window.devicePixelRatio||1,2);
@@ -411,7 +430,7 @@ function drawFog(){
   if(!settings.fog) return;
   g.globalCompositeOperation='source-over';
   const gr=g.createLinearGradient(0,0,size.x*.4,size.y);
-  gr.addColorStop(0,'rgba(38,48,86,0.80)'); gr.addColorStop(.55,'rgba(28,36,66,0.78)'); gr.addColorStop(1,'rgba(46,36,70,0.80)');
+  gr.addColorStop(0,'rgba(62,68,72,0.80)'); gr.addColorStop(.55,'rgba(50,55,60,0.78)'); gr.addColorStop(1,'rgba(70,63,58,0.80)');
   g.fillStyle=gr; g.fillRect(0,0,size.x,size.y);
   const o=map.latLngToContainerPoint(START);
   const pat=g.createPattern(clouds,'repeat'); pat.setTransform(new DOMMatrix().translate(((o.x%512)+512)%512,((o.y%512)+512)%512));
@@ -427,10 +446,11 @@ map.on('move zoom resize viewreset',drawFog);
 const trailLayer=L.layerGroup().addTo(map);
 let liveLine=null, liveGlow=null;
 function lighten(h){ const n=parseInt(h.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255,m=c=>Math.round(c+(255-c)*.45); return '#'+[m(r),m(g),m(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function darken(h){ const n=parseInt(h.slice(1),16),f=c=>Math.round(c*.58); return '#'+[f(n>>16),f((n>>8)&255),f(n&255)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
 function lineFor(pts,live,color){
-  const c=color||me.color||'#ffd77e';
-  const glow=L.polyline(pts,{pane:'trails',color:live===true?'#7ff0aa':c,weight:12,opacity:.35,lineCap:'round',lineJoin:'round',interactive:false});
-  const core=L.polyline(pts,{pane:'trails',color:live===true?'#b9ffd3':lighten(c),weight:4,opacity:1,lineCap:'round',lineJoin:'round',interactive:false,dashArray:live===2?'1 9':null});
+  const c=color||me.color||'#d6b98c';
+  const glow=L.polyline(pts,{pane:'trails',color:live===true?'#a9d1b2':c,weight:12,opacity:.45,lineCap:'round',lineJoin:'round',interactive:false});
+  const core=L.polyline(pts,{pane:'trails',color:live===true?'#4f7d5b':darken(c),weight:4,opacity:1,lineCap:'round',lineJoin:'round',interactive:false,dashArray:live===2?'1 9':null});
   return [glow,core];
 }
 function drawTrails(){
@@ -455,7 +475,7 @@ function renderMarkers(){
   for(const p of places()){
     const icon=L.divIcon({html:pinHtml(p),className:'',iconSize:[38,38],iconAnchor:[19,19]});
     if(markers[p.id]) markers[p.id].setIcon(icon);
-    else markers[p.id]=L.marker([p.lat,p.lng],{icon,riseOnHover:true}).addTo(map).on('click',()=>openPlace(p.id));
+    else markers[p.id]=L.marker([p.lat,p.lng],{icon,riseOnHover:true}).addTo(map).on('click',e=>drawing?addDrawPt(e.latlng):openPlace(p.id));
   }
   for(const id in markers) if(!placeById(id)){ map.removeLayer(markers[id]); delete markers[id]; }
 }
@@ -501,12 +521,14 @@ function renderHud(){
   document.querySelector('#bar>div').style.width=Math.round(li.into/li.need*100)+'%';
   if(li.lv>prevLv){ prevLv=li.lv; vibrate([80,60,80]); toast(`⬆️ Level ${li.lv}: ${li.title}!`); }
 }
-function setGps(state,txt){ $('gpsDot').style.background=state==='ok'?'#5fd38d':state==='wait'?'#f2c66d':state==='err'?'#ff6b6b':'#667'; $('gpsTxt').textContent=txt; }
+function setGps(state,txt){ $('gpsDot').style.background=state==='ok'?'#8fbf9a':state==='wait'?'#d6b98c':state==='err'?'#d98f84':'#6b7073'; $('gpsTxt').textContent=txt; }
 
 /* ================= Walking ================= */
 let watchId=null, meMk=null, acc=null, wake=null, follow=true, cur=LS.get('ud_curwalk',null), lastFix=null, liveT=null;
 if(cur){ if(cur.pts&&cur.pts.length>1) walks.push(finalize(cur)); cur=null; LS.set('ud_walks',walks); LS.set('ud_curwalk',null); }
 function finalize(w){ w.end=w.end||w.last||Date.now(); delete w.last; return w; }
+function revealR(lat,lng,Rm){ let n=0; const s=Math.ceil(Rm/15); for(let i=-s;i<=s;i++) for(let j=-s;j<=s;j++){ const a=lat+i*CELL,o=lng+j*CELL; if(dist(lat,lng,a,o)>Rm*.6) continue; const k=key(a,o); if(!cells.has(k)){cells.add(k);n++;} } return n; }
+function revealPath(pts){ let n=0; for(let i=0;i<pts.length;i++){ const [a,o]=pts[i]; if(i){ const [pa,po]=pts[i-1]; const d=dist(pa,po,a,o); if(d<2000){ const m=Math.max(1,Math.ceil(d/10)); for(let s=1;s<=m;s++) n+=reveal(pa+(a-pa)*s/m,po+(o-po)*s/m); continue; } } n+=reveal(a,o); } return n; }
 function reveal(lat,lng){ let n=0; const s=Math.ceil(REVEAL_M/15); for(let i=-s;i<=s;i++) for(let j=-s;j<=s;j++){ const a=lat+i*CELL,o=lng+j*CELL; if(dist(lat,lng,a,o)>REVEAL_M*.6) continue; const k=key(a,o); if(!cells.has(k)){cells.add(k);n++;} } return n; }
 const saveCur=debounce(()=>LS.set('ud_curwalk',cur),3000);
 function onFix(pos){
@@ -611,17 +633,20 @@ async function openPlace(id){
   const fimgs=await Promise.all(fk.map(k=>getPhoto(k)));
   const mine=await Promise.all(p.shots.map((_,i)=>shots[p.id+'#'+i]?getPhoto(p.id+'#'+i):null));
   const done=shotsDone(p);
+  const canGal=near||!!visits[p.id];
+  const ak=Object.keys(album).filter(k=>album[k].pid===p.id).sort((a,b)=>album[a].ts-album[b].ts);
+  const aimgs=await Promise.all(ak.map(k=>getPhoto(k)));
   const bio=p.story||p.bio||(t&&t.extract)||'';
   openSheet(`<div class="grab"></div>
     ${photos.length?`<div class="carousel">${photos.map(u=>`<img src="${esc(u)}" loading="lazy" referrerpolicy="no-referrer">`).join('')}</div>`
-      :`<div class="hero" style="background:linear-gradient(135deg,${c.c}33,#1d2742)">${c.ic}</div>`}
+      :`<div class="hero" style="background:linear-gradient(135deg,${c.c}33,#2f3539)">${c.ic}</div>`}
     <div class="sh">
       <h2>${esc(p.name)}</h2>${p.ar?`<div class="ar">${esc(p.ar)}</div>`:''}
       <div class="badges">
         <span class="badge" style="border-color:${c.c}66">${c.ic} ${c.n}</span>
         <span class="badge">${TIMES[p.time||'any']}</span>
         <span class="badge">${d!==null?'📏 '+fmtD(d):'📏 start a walk'}</span>
-        ${visits[p.id]?'<span class="badge" style="color:var(--ok)">✓ Visited</span>':''}
+        ${visits[p.id]?`<span class="badge" style="color:var(--ok)">✓ Visited ${new Date(visits[p.id]).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</span>`:''}
       </div>
       ${bio?`<p>${esc(bio)}</p>`:`<p style="color:var(--muted)" id="bioLoad">Looking up this place…</p>`}
       ${t&&t.url?`<a class="lnk" href="${esc(t.url)}" target="_blank" rel="noopener">Read more on Wikipedia →</a>`:''}
@@ -630,9 +655,16 @@ async function openPlace(id){
         <div class="ck">${shots[p.id+'#'+i]?'✓':i+1}</div>
         <div class="t">${esc(s)}</div>
         ${mine[i]?`<img src="${mine[i]}" data-a="view" data-k="${esc(p.id+'#'+i)}">`:''}
-        <button data-a="shoot" data-id="${esc(p.id)}" data-i="${i}" ${near?'':'disabled'}>${mine[i]?'Retake':(p.selfie&&i===0?'🤳':'📷')}</button>
+        ${canGal?`<button class="g" data-a="shootg" data-id="${esc(p.id)}" data-i="${i}" title="From gallery">🖼️</button>`:''}
+        ${near?`<button data-a="shoot" data-id="${esc(p.id)}" data-i="${i}">${mine[i]?'Retake':(p.selfie&&i===0?'🤳':'📷')}</button>`:''}
+        ${!canGal?`<button disabled>🔒</button>`:''}
       </div>`).join('')}
-      ${!near?`<p style="font-size:12px;color:var(--muted)">🔒 Get within ${NEAR_M} m to take the shots.</p>`:''}
+      ${!visits[p.id]&&!near?`<div class="logcard"><b>Been here already?</b><span>Log the visit to clear the fog around it and add photos from your gallery.</span>
+        <div class="row" style="margin-top:8px"><button class="btn pri" data-a="logvisit" data-id="${esc(p.id)}">📍 I was here</button></div></div>`
+        :!near?`<p style="font-size:12px;color:var(--muted)">Not here right now? Use 🖼️ to pick shots from your gallery.</p>`:''}
+      ${visits[p.id]?`<div class="sec">🖼️ Album <span style="color:var(--muted);font-weight:600;font-size:12px">${ak.length}</span></div>
+        ${ak.length?`<div class="fstrip">${ak.map((k,i)=>aimgs[i]?`<img src="${aimgs[i]}" data-a="aview" data-k="${esc(k)}">`:'').join('')}</div>`:`<p style="font-size:12px;color:var(--muted);margin:4px 0">Any photos from this place, as many as you like.</p>`}
+        <div class="row" style="margin-top:6px"><button class="btn" data-a="albumadd" data-id="${esc(p.id)}">➕ Add photos from gallery</button></div>`:''}
       ${fk.length?`<div class="sec">👥 From friends</div><div class="fstrip">${fk.map((k,i)=>fimgs[i]?`<img src="${fimgs[i]}" data-a="fview" data-k="${esc(k)}">`:'').join('')}</div>`:''}
       ${p.tip?`<div class="tip">💡 ${esc(p.tip)}</div>`:''}
       <div class="row">
@@ -647,6 +679,17 @@ async function openPlace(id){
 /* ---- photos ---- */
 let pending=null;
 function shoot(p,i){ pending={p,i}; $((p.selfie&&i===0)?'fileUser':'fileEnv').click(); }
+function shootGal(p,i){ pending={p,i}; $('fileGal1').click(); }
+let pendingAlbum=null;
+async function onAlbum(e){
+  const fs=[...(e.target.files||[])]; e.target.value=''; const p=pendingAlbum; pendingAlbum=null; if(!fs.length||!p) return;
+  toast(`Adding ${fs.length} photo${fs.length>1?'s':''}…`); let n=0;
+  for(const f of fs){ try{ const data=await compress(f); const k=p.id+'~'+Date.now()+'_'+n; await putPhoto(k,data); album[k]={pid:p.id,ts:Date.now()}; if(!covers[p.id]){ covers[p.id]=await thumb(data); } n++; }catch(err){} }
+  LS.set('ud_album',album); LS.set('ud_covers',covers);
+  if(!visits[p.id]){ visits[p.id]=Date.now(); LS.set('ud_visits',visits); }
+  renderMarkers(); renderHud(); toast(`🖼️ ${n} photo${n===1?'':'s'} added · +${n*XP.album} XP`); openPlace(p.id);
+}
+$('fileAlbum').onchange=onAlbum;
 async function compress(file){ const u=URL.createObjectURL(file); try{ const img=await new Promise((res,rej)=>{const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=u;}); const s=Math.min(1,1400/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.82); } finally{ URL.revokeObjectURL(u); } }
 async function thumb(src){ const im=await new Promise((res,rej)=>{const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src;}); const s=Math.min(1,240/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.round(im.width*s); c.height=Math.round(im.height*s); c.getContext('2d').drawImage(im,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.72); }
 async function onPhoto(e){
@@ -664,15 +707,15 @@ async function onPhoto(e){
     openPlace(p.id);
   }catch(err){ toast('Could not read that photo'); }
 }
-$('fileEnv').onchange=onPhoto; $('fileUser').onchange=onPhoto;
+$('fileEnv').onchange=onPhoto; $('fileUser').onchange=onPhoto; $('fileGal1').onchange=onPhoto;
 
 /* ---- viewer ---- */
 let vList=[], vIdx=0;
 async function openViewer(list,idx){ vList=list; vIdx=idx; await showV(); $('viewer').classList.add('open'); }
 async function showV(){
-  const k=vList[vIdx], fs=fshots[k], [pid0,i]=k.split('#'), pid=fs?fs.pid:pid0, p=placeById(pid), src=await getPhoto(k);
-  const sub=fs?`📸 by ${esc((friends[fs.from]||{}).name||'a friend')} · ${esc(fs.label||'')}`:`${esc(p?p.shots[+i]||'':'')}`;
-  const dt=fs?fs.ts:shots[k];
+  const k=vList[vIdx], fs=fshots[k], al=album[k], [pid0,i]=k.split('#'), pid=fs?fs.pid:al?al.pid:pid0, p=placeById(pid), src=await getPhoto(k);
+  const sub=fs?`📸 by ${esc((friends[fs.from]||{}).name||'a friend')} · ${esc(fs.label||'')}`:al?'Album':`${esc(p?p.shots[+i]||'':'')}`;
+  const dt=fs?fs.ts:al?al.ts:shots[k];
   $('viewer').innerHTML=`<img src="${src||''}"><div class="cap"><b>${esc(p?p.name:'')}</b><small>${sub} · ${dt?new Date(dt).toLocaleDateString():''}</small></div>
    <div class="vnav"><button class="btn" data-v="-1" ${vIdx?'':'disabled'}>‹</button><button class="btn" data-v="x">Close</button><button class="btn" data-v="1" ${vIdx<vList.length-1?'':'disabled'}>›</button></div>`;
 }
@@ -728,13 +771,22 @@ sheet.addEventListener('click',async e=>{
     LS.set('ud_custom2',custom); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_teasers',teasers);
     renderMarkers(); renderHud(); closeSheet(); toast('Place deleted');
   }
+  else if(a==='shootg'){ const p=placeById(el.dataset.id); p&&shootGal(p,+el.dataset.i); }
+  else if(a==='albumadd'){ pendingAlbum=placeById(el.dataset.id); $('fileAlbum').click(); }
+  else if(a==='aview'){ const pid=album[el.dataset.k].pid; const ks=Object.keys(album).filter(k=>album[k].pid===pid).sort((x,y)=>album[x].ts-album[y].ts); openViewer(ks,ks.indexOf(el.dataset.k)); }
+  else if(a==='logvisit'){ openLogVisit(el.dataset.id); }
+  else if(a==='logsave'){ const p=placeById(el.dataset.id); if(!p) return; const ts=dateTs($('logDate').value);
+    const n=revealR(p.lat,p.lng,150); visits[p.id]=ts; logged[p.id]=true; LS.set('ud_visits',visits); LS.set('ud_logged',logged); LS.set('ud_cells',[...cells]);
+    drawFog(); renderMarkers(); renderHud(); vibrate([100,50,100]); toast(`🏆 ${p.name} logged · +${XP.visit+n} XP`); openPlace(p.id); }
+  else if(a==='logdraw'){ closeSheet(); startDraw(); }
+  else if(a==='drawsave'){ saveDraw(dateTs($('drawDate').value)); }
   else if(a==='fview'){ const ks=Object.keys(fshots).filter(k=>fshots[k].pid===fshots[el.dataset.k].pid); openViewer(ks,ks.indexOf(el.dataset.k)); }
   else if(a==='sharewalk'){ const w=walks.find(x=>x.id===el.dataset.id); w&&shareWalk(w); }
   else if(a==='addres'){ const r=searchRes[+el.dataset.i]; if(r){ if(searchPin){map.removeLayer(searchPin);searchPin=null;} addPlaceAt(r.lat,r.lng,r.name,r.cat); } }
   else if(a==='gores'){ const r=searchRes[+el.dataset.i]; if(r) goResult(r); }
   else if(a==='openp'){ const p=placeById(el.dataset.id); if(p){ closeSheet(); follow=false; map.setView([p.lat,p.lng],17); setTimeout(()=>openPlace(p.id),150); } }
   else if(a==='comp'){ const id=el.dataset.id; if(!cur) return; cur.with=cur.with||[]; const i=cur.with.findIndex(x=>x.id===id); if(i>=0) cur.with.splice(i,1); else cur.with.push({id,name:friends[id].name,emoji:friends[id].emoji}); saveCur(); openCompanions(); renderLive(); }
-  else if(a==='compadd'){ const n=($('compName').value||'').trim(); if(!n||!cur) return; const id='n'+Date.now(); friends[id]={id,name:n,emoji:'🙂',color:'#7fb3ff',local:true}; LS.set('ud_friends',friends); cur.with=cur.with||[]; cur.with.push({id,name:n,emoji:'🙂'}); saveCur(); openCompanions(); renderLive(); }
+  else if(a==='compadd'){ const n=($('compName').value||'').trim(); if(!n||!cur) return; const id='n'+Date.now(); friends[id]={id,name:n,emoji:'🙂',color:'#8fa9c4',local:true}; LS.set('ud_friends',friends); cur.with=cur.with||[]; cur.with.push({id,name:n,emoji:'🙂'}); saveCur(); openCompanions(); renderLive(); }
   else if(a==='pemoji'){ me.emoji=el.dataset.v; LS.set('ud_me',me); openProfile(); }
   else if(a==='pcolor'){ me.color=el.dataset.v; LS.set('ud_me',me); drawTrails(); openProfile(); }
   else if(a==='psave'){ me.name=($('pName').value||'').trim(); LS.set('ud_me',me); closeSheet(); toast('Profile saved'); if(curPage==='stats') renderStats(); if(pendingShare){ const w=pendingShare; pendingShare=null; shareWalk(w); } }
@@ -758,7 +810,7 @@ function renderPlaces(){
   list=list.filter(({p})=> placeFilter==='all'||(placeFilter==='todo'&&!visits[p.id])||(placeFilter==='done'&&visits[p.id])||(placeFilter==='day'&&(p.time==='day'||p.time==='any'))||(placeFilter==='night'&&(p.time==='night'||p.time==='sunset'||p.time==='any'))||p.cat===placeFilter);
   list.sort((a,b)=>(!!visits[a.p.id]-!!visits[b.p.id])||((a.d??1e9)-(b.d??1e9)));
   $('placeList').innerHTML=list.length?list.map(({p,d})=>{ const t=teasers[p.id],img=(t&&t.photos&&t.photos[0])||covers[p.id],c=CATS[p.cat],sd=shotsDone(p);
-    return `<div class="pcard" data-p="${esc(p.id)}"><div class="th" style="${img?`background-image:url('${esc(img)}')`:`background:linear-gradient(135deg,${c.c}44,#25304d)`}">${img?'':c.ic}${visits[p.id]?'<span class="ok">✓</span>':''}</div>
+    return `<div class="pcard" data-p="${esc(p.id)}"><div class="th" style="${img?`background-image:url('${esc(img)}')`:`background:linear-gradient(135deg,${c.c}44,#343a3e)`}">${img?'':c.ic}${visits[p.id]?'<span class="ok">✓</span>':''}</div>
       <div class="tx"><div class="nm">${esc(p.name)}</div><div class="ar">${esc(p.ar||c.n)}</div>
       <div class="meta">${TIMES[p.time||'any']}${d!==null?' · '+fmtD(d):''} · 📸 ${sd}/${p.shots.length}</div>
       <div class="prog"><div style="width:${p.shots.length?sd/p.shots.length*100:0}%"></div></div></div></div>`; }).join('')
@@ -768,10 +820,10 @@ $('placeFilters').addEventListener('click',e=>{ const b=e.target.closest('[data-
 $('placeList').addEventListener('click',e=>{ const c=e.target.closest('[data-p]'); if(!c) return; const p=placeById(c.dataset.p); go('map'); follow=false; map.setView([p.lat,p.lng],17); setTimeout(()=>openPlace(p.id),120); });
 
 async function renderGallery(){
-  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]).concat(Object.keys(fshots).sort((a,b)=>fshots[b].ts-fshots[a].ts));
+  const keys=Object.keys(shots).sort((a,b)=>shots[b]-shots[a]).concat(Object.keys(album).sort((a,b)=>album[b].ts-album[a].ts)).concat(Object.keys(fshots).sort((a,b)=>fshots[b].ts-fshots[a].ts));
   if(!keys.length){ $('galBody').innerHTML=`<div class="empty"><b>📷</b>No photos yet.<br>Visit a place and work through its shot list.</div>`; return; }
   const photos=await allPhotos(); const by={};
-  for(const k of keys){ const pid=fshots[k]?fshots[k].pid:k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
+  for(const k of keys){ const pid=fshots[k]?fshots[k].pid:album[k]?album[k].pid:k.split('#')[0]; (by[pid]=by[pid]||[]).push(k); }
   $('galBody').innerHTML=Object.entries(by).map(([pid,ks])=>{ const p=placeById(pid); return `<div class="galhead">${esc(p?p.name:'Removed place')} · ${ks.length}</div><div class="gal">${ks.map(k=>photos[k]?`<img src="${photos[k]}" data-k="${esc(k)}">`:'').join('')}</div>`; }).join('');
   $('galBody').onclick=e=>{ const im=e.target.closest('img[data-k]'); if(im) openViewer(keys,keys.indexOf(im.dataset.k)); };
 }
@@ -786,19 +838,19 @@ function renderStats(){
   const cats=Object.entries(CATS).map(([k,c])=>{ const all=ps.filter(p=>p.cat===k); if(!all.length) return ''; const d=all.filter(p=>visits[p.id]).length;
     return `<div class="catrow"><span style="width:92px">${c.ic} ${c.n}</span><div class="cb"><div style="width:${d/all.length*100}%;background:${c.c}"></div></div><span style="width:34px;text-align:right">${d}/${all.length}</span></div>`; }).join('');
   $('statsBody').innerHTML=`
-    <div class="ring"><svg width="84" height="84" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${R}" fill="none" stroke="#26304b" stroke-width="9"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="#f2c66d" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 42 42)"/></svg>
+    <div class="ring"><svg width="84" height="84" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${R}" fill="none" stroke="#353b3f" stroke-width="9"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="#d6b98c" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 42 42)"/></svg>
       <div><div class="big">${v} / ${ps.length}</div><div style="font-size:13px;color:var(--muted)">places visited · ${Math.round(pct*100)}%</div><div style="font-size:13px;margin-top:4px">${ps.length-v} still waiting for you</div></div></div>
     <div class="grid2">
       <div class="tile"><div class="v">${fmtD(totalDist())}</div><div class="k">walked</div></div>
       <div class="tile"><div class="v">${(cells.size*225/1e6).toFixed(2)} km²</div><div class="k">unfogged</div></div>
-      <div class="tile"><div class="v">${sh} / ${totalShots}</div><div class="k">shots taken</div></div>
+      <div class="tile"><div class="v">${sh} / ${totalShots}</div><div class="k">shots · ${Object.keys(album).length} in albums</div></div>
       <div class="tile"><div class="v">${walks.length}</div><div class="k">walks · ${days} day${days===1?'':'s'}</div></div>
       <div class="tile"><div class="v">${fmtT(ms)}</div><div class="k">time exploring</div></div>
       <div class="tile"><div class="v">${fmtD(longest)}</div><div class="k">longest walk</div></div>
     </div>
     <div class="sec">By category</div>${cats}
     <div class="sec">Recent walks</div>
-    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span><button class="lnk" data-ws="${esc(w.id)}" style="margin-right:10px">📤 Share</button><span class="lnk">Map →</span></span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
+    ${walks.length?walks.slice(-8).reverse().map(w=>`<div class="walkrow" data-w="${esc(w.id)}"><div><b>${w.manual?'✏️ ':''}${fmtD(w.dist)}</b> <small>· ${fmtT(w.end-w.start)}</small><br><small>${new Date(w.start).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</small></div><span><button class="lnk" data-ws="${esc(w.id)}" style="margin-right:10px">📤 Share</button><span class="lnk">Map →</span></span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">No walks yet. Tap ▶ Start walk on the map.</p>'}
     <div class="sec">You & friends</div>
     <div class="frow" data-fp="1"><span class="av" style="border-color:${me.color}">${esc(me.emoji)}</span><div class="tx">${esc(me.name||'Set your name')}<small>Your avatar and trail colour · tap to edit</small></div><span class="lnk">Edit</span></div>
     ${Object.values(friends).map(f=>{ const n=fwalks.filter(w=>w.from===f.id).length; return `<div class="frow"><span class="av" style="border-color:${f.color}">${esc(f.emoji)}</span><div class="tx">${esc(f.name)}<small>${n?n+' shared walk'+(n>1?'s':''):'tagged on your walks'}</small></div></div>`; }).join('')}
@@ -816,7 +868,7 @@ function renderStats(){
 
 /* ================= Backup ================= */
 async function exportData(){
-  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,me,friends,fwalks,fshots,covers,photos:await allPhotos()};
+  const payload={app:'unfog-damascus',v:2,at:new Date().toISOString(),cells:[...cells],visits,shots,custom,walks,me,friends,fwalks,fshots,covers,album,logged,photos:await allPhotos()};
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
   a.download='unfog-damascus-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   toast('Backup saved to Downloads');
@@ -831,7 +883,7 @@ async function importData(f){
     for(const k in (p.photos||{})) await putPhoto(k,p.photos[k]);
     if(p.me&&p.me.id===me.id) Object.assign(me,p.me);
     Object.assign(friends,p.friends||{}); for(const w of (p.fwalks||[])) if(!fwalks.find(x=>x.id===w.id&&x.from===w.from)) fwalks.push(w);
-    Object.assign(fshots,p.fshots||{}); Object.assign(covers,p.covers||{});
+    Object.assign(fshots,p.fshots||{}); Object.assign(covers,p.covers||{}); Object.assign(album,p.album||{}); Object.assign(logged,p.logged||{}); LS.set('ud_album',album); LS.set('ud_logged',logged);
     LS.set('ud_me',me); LS.set('ud_friends',friends); LS.set('ud_fwalks',fwalks); LS.set('ud_fshots',fshots); LS.set('ud_covers',covers);
     LS.set('ud_cells',[...cells]); LS.set('ud_visits',visits); LS.set('ud_shots',shots); LS.set('ud_custom2',custom); LS.set('ud_walks',walks);
     drawFog(); drawTrails(); renderMarkers(); renderHud(); renderStats(); toast('Backup restored');
@@ -844,6 +896,7 @@ function syncTools(){ $('tFog').classList.toggle('off',!settings.fog); $('tTrail
 $('tFog').onclick=()=>{ settings.fog=!settings.fog; LS.set('ud_settings',settings); syncTools(); drawFog(); toast(settings.fog?'Fog on':'Fog off: full map view'); };
 $('tTrail').onclick=()=>{ settings.trails=!settings.trails; LS.set('ud_settings',settings); syncTools(); drawTrails(); toast(settings.trails?'Trails shown':'Trails hidden'); };
 $('tSearch').onclick=()=>openSearch();
+$('tDraw').onclick=()=>drawing?cancelDraw():startDraw();
 $('tMe').onclick=()=>{ follow=true; if(lastPos) map.setView(lastPos,17); else toast('Start a walk to find you'); };
 
 /* ================= Search ================= */
@@ -899,7 +952,7 @@ function goResult(r){
 let pendingShare=null;
 function openProfile(){
   const em=['🧭','🦅','🐺','🦁','🐪','🦊','🐢','🚶','🧗','📸','☕','🌙','⭐','🔥','🌿','🎒'];
-  const co=['#ffd77e','#ff8a65','#ff7a9c','#c49bff','#7fb3ff','#5fd3c4','#8fd18f','#f2f2f2'];
+  const co=['#d6b98c','#d49a85','#c79aa8','#a99cc4','#8fa9c4','#86b5ab','#9fbf8f','#e6e1d8'];
   openSheet(`<div class="grab"></div><div class="sh"><h2>Your explorer</h2>
     <div style="display:flex;justify-content:center;margin:12px 0"><span class="av" style="width:70px;height:70px;font-size:36px;border-width:4px;border-color:${me.color}">${esc(me.emoji)}</span></div>
     <label class="f">Name (friends see this on shared walks)</label><input class="f" id="pName" value="${esc(me.name)}" maxlength="30" placeholder="Yousuf">
@@ -914,6 +967,7 @@ async function shareWalk(w){
   if(!me.name){ pendingShare=w; toast('First, set your name'); openProfile(); return; }
   const all=await allPhotos(); const photos={}, meta={};
   for(const k in shots){ if(shots[k]>=w.start&&shots[k]<=(w.end||Date.now())+60000&&all[k]){ photos[k]=all[k]; const [pid,i]=k.split('#'); const p=placeById(pid); meta[k]={pid,label:p?p.shots[+i]:'',ts:shots[k]}; } }
+  for(const k in album){ const al=album[k]; const inWin=(al.ts>=w.start&&al.ts<=(w.end||Date.now())+60000)||(w.manual&&w.places&&w.places.includes(al.pid)); if(inWin&&all[k]){ photos[k]=all[k]; meta[k]={pid:al.pid,label:'Album',ts:al.ts}; } }
   const pids=new Set(Object.values(meta).map(m=>m.pid));
   const placesOut=custom.filter(p=>pids.has(p.id));
   const payload={ app:'unfog-walk', v:1, from:{id:me.id,name:me.name,emoji:me.emoji,color:me.color}, walk:{id:w.id,start:w.start,end:w.end,dist:w.dist,pts:w.pts,with:w.with||[]}, meta, photos, places:placesOut };
@@ -935,7 +989,7 @@ async function importWalk(p){
     if(fwalks.find(x=>x.id===p.walk.id&&x.from===f.id)){ toast('You already have this walk'); return; }
     const w=Object.assign({},p.walk,{from:f.id}); fwalks.push(w);
     const before=cells.size;
-    for(let i=0;i<w.pts.length;i++){ const [a,o]=w.pts[i]; if(i){ const [pa,po]=w.pts[i-1]; const d=dist(pa,po,a,o); if(d<400){ const n=Math.max(1,Math.ceil(d/10)); for(let s=1;s<=n;s++) reveal(pa+(a-pa)*s/n,po+(o-po)*s/n); continue; } } reveal(a,o); }
+    revealPath(w.pts);
     for(const pl of (p.places||[])) if(!placeById(pl.id)) custom.push(Object.assign({},pl,{sharedBy:f.name}));
     let np=0;
     for(const k in (p.photos||{})){ const nk='f:'+f.id+':'+k; await putPhoto(nk,p.photos[k]); const m=(p.meta||{})[k]||{}; fshots[nk]={pid:m.pid||k.split('#')[0],from:f.id,label:m.label||'',ts:m.ts||w.start}; if(m.pid&&placeById(m.pid)&&!visits[m.pid]){ visits[m.pid]=m.ts||w.start; } np++; }
@@ -947,6 +1001,60 @@ async function importWalk(p){
       <p>Their trail is now on your map in their colour, and the fog it cleared counts for you too.</p>
       <div class="row"><button class="btn pri" data-a="close">Nice</button></div></div>`);
   }catch(e){ toast('That shared walk could not be read'); }
+}
+
+/* ================= Log a past visit ================= */
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dateTs(v){ if(!v) return Date.now(); const [y,m,d]=v.split('-').map(Number); const t=new Date(y,m-1,d,12,0,0).getTime(); return Math.min(t,Date.now()); }
+function openLogVisit(id){
+  const p=placeById(id); if(!p) return;
+  openSheet(`<div class="grab"></div><div class="sh"><h2>📍 Log a visit</h2>
+    <p>${esc(p.name)}</p>
+    <label class="f">When were you there?</label><input class="f" type="date" id="logDate" value="${todayStr()}" max="${todayStr()}">
+    <p style="font-size:13px;color:var(--muted)">This clears the fog around the place and unlocks its shot list and album, so you can add photos from your gallery.</p>
+    <div class="row"><button class="btn pri" data-a="logsave" data-id="${esc(p.id)}">Log visit</button><button class="btn" data-a="close">Cancel</button></div>
+    <div class="row"><button class="btn" data-a="logdraw">✏️ Also draw the path I took</button></div></div>`);
+}
+
+/* ================= Draw a path ================= */
+let drawing=null, drawGlow=null, drawCore=null, drawDots=null;
+function drawDist(){ let d=0; for(let i=1;i<(drawing||[]).length;i++) d+=dist(drawing[i-1][0],drawing[i-1][1],drawing[i][0],drawing[i][1]); return d; }
+function renderDraw(){
+  if(!drawing) return;
+  if(!drawGlow){ drawGlow=L.polyline([], {pane:'trails',color:me.color,weight:12,opacity:.3,lineCap:'round',interactive:false}).addTo(map); drawCore=L.polyline([], {pane:'trails',color:darken(me.color),weight:4,dashArray:'8 8',lineCap:'round',interactive:false}).addTo(map); drawDots=L.layerGroup().addTo(map); }
+  drawGlow.setLatLngs(drawing); drawCore.setLatLngs(drawing); drawDots.clearLayers();
+  drawing.forEach((pt,i)=>L.circleMarker(pt,{radius:i===drawing.length-1?6:3.5,color:'#fff',weight:2,fillColor:me.color,fillOpacity:1,interactive:false}).addTo(drawDots));
+  $('drawTxt').innerHTML=drawing.length?`✏️ ${drawing.length} point${drawing.length>1?'s':''} · ${fmtD(drawDist())}<small>Keep tapping along your route. Save when you're done.</small>`
+    :`✏️ Tap along the streets you took<small>Each tap adds a point. Follow the streets, not straight across blocks.</small>`;
+  $('dSave').disabled=drawing.length<2; $('dUndo').disabled=!drawing.length;
+}
+function addDrawPt(ll){ if(!drawing) return; drawing.push([+ll.lat.toFixed(5),+ll.lng.toFixed(5)]); renderDraw(); }
+function startDraw(){
+  if(watchId!==null){ toast('End your live walk first'); return; }
+  drawing=[]; go('map'); closeSheet(); $('drawBar').classList.add('show'); $('walkWrap').style.display='none'; $('tDraw').classList.add('on');
+  $('tDraw').style.background='var(--gold)'; renderDraw(); toast('Tap the map along the route you walked');
+}
+function endDraw(){
+  drawing=null; [drawGlow,drawCore,drawDots].forEach(l=>l&&map.removeLayer(l)); drawGlow=drawCore=drawDots=null;
+  $('drawBar').classList.remove('show'); $('walkWrap').style.display=''; $('tDraw').style.background='';
+}
+function cancelDraw(){ endDraw(); toast('Drawing cancelled'); }
+map.on('click',e=>{ if(drawing) addDrawPt(e.latlng); });
+$('dUndo').onclick=()=>{ if(drawing&&drawing.length){ drawing.pop(); renderDraw(); } };
+$('dCancel').onclick=cancelDraw;
+$('dSave').onclick=()=>{ if(!drawing||drawing.length<2) return;
+  openSheet(`<div class="grab"></div><div class="sh"><h2>✏️ Save path</h2><p>${fmtD(drawDist())} drawn</p>
+    <label class="f">When did you walk it?</label><input class="f" type="date" id="drawDate" value="${todayStr()}" max="${todayStr()}">
+    <div class="row"><button class="btn pri" data-a="drawsave">Save path</button><button class="btn" data-a="close">Keep drawing</button></div></div>`); };
+function saveDraw(ts){
+  if(!drawing||drawing.length<2) return;
+  const pts=drawing.slice(), d=drawDist();
+  const near=places().filter(p=>pts.some(pt=>dist(pt[0],pt[1],p.lat,p.lng)<=NEAR_M)).map(p=>p.id);
+  const w={ id:'m'+Date.now(), manual:true, start:ts, end:ts+Math.round(d/1.2)*1000, pts, dist:d, with:[], places:near };
+  const before=cells.size; revealPath(pts);
+  walks.push(w); LS.set('ud_walks',walks); LS.set('ud_cells',[...cells]);
+  endDraw(); closeSheet(); drawFog(); drawTrails(); renderHud();
+  toast(`✏️ Path saved · ${fmtD(d)} · +${cells.size-before} tiles`);
 }
 
 /* ================= Boot ================= */
